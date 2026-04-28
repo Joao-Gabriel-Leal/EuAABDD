@@ -1,0 +1,693 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Source+Serif+4:wght@600;700&display=swap');
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+    --blue: #063d86;
+    --blue-2: #0754b8;
+    --yellow: #ffd318;
+    --yellow-2: #fff4b2;
+    --ink: #11203a;
+    --muted: #5d6b82;
+    --line: #d8e1ee;
+    --paper: #fffdf4;
+    --green: #087f5b;
+    --red: #b42318;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body.club-body {
+    margin: 0;
+    font-family: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+    color: var(--ink);
+    background: #f4f7fb;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+button,
+input,
+select {
+    font: inherit;
+}
+
+.club-topbar {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    z-index: 50;
+    display: flex;
+    width: min(1180px, calc(100% - 24px));
+    min-height: 72px;
+    transform: translateX(-50%);
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    border: 1px solid rgba(255, 255, 255, .7);
+    background: rgba(255, 255, 255, .92);
+    padding: 10px 16px;
+    box-shadow: 0 10px 30px rgba(6, 61, 134, .14);
+    backdrop-filter: blur(14px);
+}
+
+.club-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.club-brand__mark {
+    display: grid;
+    width: 48px;
+    height: 48px;
+    place-items: center;
+    background: var(--blue);
+    color: #fff;
+    font-weight: 800;
+}
+
+.club-brand strong {
+    display: block;
+    color: var(--blue);
+    font-size: 1.05rem;
+}
+
+.club-brand small,
+.club-nav a,
+.link-button {
+    color: var(--muted);
+    font-weight: 700;
+}
+
+.club-nav {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.club-nav__login,
+.link-button {
+    border: 0;
+    background: var(--yellow);
+    color: var(--blue);
+    padding: 10px 14px;
+    cursor: pointer;
+}
+
+.toast-message {
+    position: fixed;
+    top: 96px;
+    right: 24px;
+    z-index: 60;
+    max-width: 380px;
+    border-left: 6px solid var(--yellow);
+    background: #fff;
+    padding: 16px 18px;
+    box-shadow: 0 12px 30px rgba(17, 32, 58, .18);
+    font-weight: 700;
+}
+
+.club-hero {
+    height: min(92vh, 900px);
+    min-height: 720px;
+    display: grid;
+    align-items: end;
+    position: relative;
+    color: #fff;
+    background:
+        linear-gradient(90deg, rgba(2, 34, 78, .82), rgba(2, 34, 78, .35) 58%, rgba(255, 211, 24, .28)),
+        var(--hero-image) center / cover no-repeat;
+    padding: 160px max(24px, calc((100vw - 1180px) / 2)) 110px;
+}
+
+.club-hero h1,
+.login-photo h1,
+.portal-hero h1,
+.team-header h1 {
+    margin: 0;
+    font-family: 'Source Serif 4', serif;
+    font-size: 4.8rem;
+    line-height: .98;
+}
+
+.club-hero__content {
+    max-width: 680px;
+}
+
+.overline {
+    margin: 0 0 10px;
+    color: var(--yellow);
+    font-size: .9rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.hero-copy {
+    margin: 18px 0 28px;
+    max-width: 620px;
+    font-size: 1.25rem;
+    line-height: 1.55;
+}
+
+.hero-actions,
+.panel-head,
+.team-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.club-button,
+.mini-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    cursor: pointer;
+    font-weight: 800;
+    min-height: 44px;
+    padding: 0 18px;
+}
+
+.club-button--yellow {
+    background: var(--yellow);
+    color: var(--blue);
+}
+
+.club-button--light {
+    background: #fff;
+    color: var(--blue);
+}
+
+.club-button--blue,
+.mini-button {
+    background: var(--blue);
+    color: #fff;
+}
+
+.club-hero__strip {
+    position: absolute;
+    right: max(24px, calc((100vw - 1180px) / 2));
+    bottom: 28px;
+    left: max(24px, calc((100vw - 1180px) / 2));
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    border: 1px solid rgba(255, 255, 255, .55);
+    background: rgba(255, 255, 255, .16);
+    backdrop-filter: blur(10px);
+}
+
+.club-hero__strip span {
+    padding: 16px;
+    border-right: 1px solid rgba(255, 255, 255, .35);
+    color: #fff;
+    font-weight: 800;
+}
+
+.club-band {
+    padding: 24px max(24px, calc((100vw - 1180px) / 2));
+}
+
+.club-band--yellow {
+    background: var(--yellow);
+}
+
+.club-band__grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+}
+
+.club-band article {
+    border-left: 5px solid var(--blue);
+    padding-left: 16px;
+}
+
+.club-band strong {
+    display: block;
+    color: var(--blue);
+    font-size: 2rem;
+}
+
+.club-section,
+.portal-hero,
+.portal-grid,
+.team-header,
+.team-metrics,
+.ops-grid {
+    padding: 72px max(24px, calc((100vw - 1180px) / 2));
+}
+
+.club-section--blue,
+.team-header,
+.portal-hero {
+    background: var(--blue);
+    color: #fff;
+}
+
+.club-section--blue .overline,
+.team-header .overline,
+.portal-hero .overline {
+    color: var(--yellow);
+}
+
+.section-title {
+    max-width: 720px;
+    margin-bottom: 28px;
+}
+
+.section-title h2,
+.join-section h2,
+.portal-panel h2,
+.ops-panel h2,
+.login-form h2 {
+    margin: 0;
+    font-family: 'Source Serif 4', serif;
+    font-size: 2.35rem;
+    line-height: 1.06;
+    color: var(--blue);
+}
+
+.club-section--blue .section-title h2 {
+    color: #fff;
+}
+
+.venue-grid,
+.plans-grid,
+.news-grid,
+.benefit-grid,
+.portal-grid,
+.ops-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+}
+
+.venue-card,
+.news-card,
+.plan-card,
+.benefit-card,
+.portal-panel,
+.ops-panel,
+.login-form,
+.join-form,
+.member-card {
+    border: 1px solid var(--line);
+    background: #fff;
+    box-shadow: 0 12px 24px rgba(17, 32, 58, .08);
+}
+
+.venue-card img,
+.news-card img {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    display: block;
+}
+
+.venue-card div,
+.news-card div,
+.plan-card,
+.benefit-card,
+.portal-panel,
+.ops-panel,
+.login-form,
+.join-form {
+    padding: 22px;
+}
+
+.venue-card span,
+.news-card span,
+.benefit-card span,
+.plan-card > span {
+    color: var(--blue);
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.venue-card h3,
+.news-card h3,
+.benefit-card h3,
+.plan-card h3 {
+    margin: 8px 0;
+    color: var(--blue);
+    font-size: 1.4rem;
+}
+
+.venue-card p,
+.news-card p,
+.benefit-card p,
+.plan-card p,
+.join-section p,
+.portal-panel p,
+.login-form p {
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+.plan-card dl {
+    display: grid;
+    gap: 10px;
+    margin: 18px 0;
+}
+
+.plan-card dl div,
+.invoice-row,
+.ops-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+}
+
+.plan-card dt,
+.plan-card dd {
+    margin: 0;
+}
+
+.plan-card dd {
+    color: var(--blue);
+    font-weight: 800;
+}
+
+.club-section--benefits {
+    background: var(--paper);
+}
+
+.join-section,
+.login-screen {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    align-items: center;
+}
+
+.join-form,
+.login-form,
+.stack-form {
+    display: grid;
+    gap: 14px;
+}
+
+label {
+    display: grid;
+    gap: 6px;
+    color: var(--ink);
+    font-weight: 800;
+}
+
+input,
+select {
+    width: 100%;
+    border: 1px solid var(--line);
+    background: #fff;
+    padding: 12px;
+    color: var(--ink);
+}
+
+.login-screen {
+    min-height: 100vh;
+    padding: 120px max(24px, calc((100vw - 1180px) / 2)) 60px;
+    background: var(--paper);
+}
+
+.login-photo {
+    min-height: 620px;
+    display: flex;
+    flex-direction: column;
+    justify-content: end;
+    color: #fff;
+    background-position: center;
+    background-size: cover;
+    padding: 36px;
+    position: relative;
+}
+
+.login-photo::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(6, 61, 134, .05), rgba(6, 61, 134, .88));
+}
+
+.login-photo > * {
+    position: relative;
+}
+
+.check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.check-row input {
+    width: auto;
+}
+
+.form-error {
+    color: var(--red);
+    font-weight: 800;
+}
+
+.portal-hero {
+    padding-top: 132px;
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.portal-hero h1,
+.team-header h1 {
+    font-size: 3.4rem;
+}
+
+.member-card {
+    min-width: 320px;
+    background: linear-gradient(135deg, var(--yellow), #fff);
+    color: var(--blue);
+    padding: 22px;
+}
+
+.member-card strong,
+.big-number {
+    display: block;
+    font-size: 2.4rem;
+    color: var(--blue);
+}
+
+.portal-grid {
+    grid-template-columns: 2fr 1fr 1fr;
+    padding-top: 28px;
+    padding-bottom: 28px;
+}
+
+.panel-wide {
+    grid-column: span 2;
+}
+
+.invoice-list,
+.simple-list,
+.reservation-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.invoice-row {
+    padding: 14px 0 0;
+}
+
+.invoice-row small,
+.ops-row small,
+.reservation-card small {
+    display: block;
+    color: var(--muted);
+}
+
+.invoice-row em,
+.ok {
+    color: var(--green);
+    font-style: normal;
+    font-weight: 800;
+}
+
+.warn {
+    color: var(--red);
+}
+
+.simple-list span {
+    border-left: 4px solid var(--yellow);
+    padding-left: 10px;
+}
+
+.reservation-card {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 18px;
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+}
+
+.reservation-card img {
+    width: 100%;
+    height: 130px;
+    object-fit: cover;
+}
+
+.inline-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.team-header {
+    padding-top: 132px;
+}
+
+.team-header h1 {
+    color: #fff;
+}
+
+.team-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    background: var(--yellow);
+}
+
+.team-metrics article {
+    border-left: 5px solid var(--blue);
+    background: rgba(255, 255, 255, .45);
+    padding: 18px;
+}
+
+.team-metrics span {
+    color: var(--blue);
+    font-weight: 800;
+}
+
+.team-metrics strong {
+    display: block;
+    color: var(--blue);
+    font-size: 1.8rem;
+}
+
+.ops-grid {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.ops-panel h2,
+.portal-panel h2 {
+    font-size: 1.6rem;
+}
+
+.ops-row {
+    padding: 13px 0 0;
+}
+
+@media (max-width: 920px) {
+    .club-nav {
+        overflow-x: auto;
+        justify-content: flex-start;
+    }
+
+    .club-hero h1,
+    .login-photo h1 {
+        font-size: 3.1rem;
+    }
+
+    .club-hero__strip,
+    .club-band__grid,
+    .venue-grid,
+    .plans-grid,
+    .news-grid,
+    .benefit-grid,
+    .portal-grid,
+    .team-metrics,
+    .ops-grid,
+    .join-section,
+    .login-screen {
+        grid-template-columns: 1fr;
+    }
+
+    .club-hero__strip {
+        position: static;
+        margin-top: 34px;
+    }
+
+    .club-hero__strip span {
+        border-right: 0;
+        border-top: 1px solid rgba(255, 255, 255, .35);
+    }
+
+    .portal-hero,
+    .team-header,
+    .hero-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .panel-wide {
+        grid-column: span 1;
+    }
+
+    .reservation-card,
+    .inline-form {
+        grid-template-columns: 1fr;
+    }
+
+    .login-photo {
+        min-height: 460px;
+    }
+}
+
+@media (max-width: 640px) {
+    .club-topbar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .club-nav {
+        width: 100%;
+    }
+
+    .club-hero {
+        padding-top: 170px;
+        height: 820px;
+        min-height: 820px;
+    }
+
+    .club-hero h1,
+    .portal-hero h1,
+    .team-header h1 {
+        font-size: 2.6rem;
+    }
+
+    .section-title h2,
+    .join-section h2 {
+        font-size: 2rem;
+    }
+}
