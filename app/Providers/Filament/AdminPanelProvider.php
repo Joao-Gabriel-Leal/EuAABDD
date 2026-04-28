@@ -6,7 +6,9 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages\Dashboard;
+use Filament\Navigation\NavigationGroup;
+use App\Filament\Pages\GestaoDashboard;
+use App\Filament\Pages\ValidarCarteirinha;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -24,18 +26,28 @@ class AdminPanelProvider extends PanelProvider
     {
         return $panel
             ->default()
-            ->id('admin')
-            ->path('admin')
-            ->brandName('AABB Brasília | Equipe')
+            ->id('painel-tecnico-aabb')
+            ->path('painel-tecnico-aabb')
+            ->brandName('Painel técnico AABB')
             ->login()
             ->colors([
                 'primary' => Color::Blue,
                 'warning' => Color::Amber,
+                'success' => Color::Green,
+                'danger' => Color::Red,
+            ])
+            ->navigationGroups([
+                NavigationGroup::make('Secretaria'),
+                NavigationGroup::make('Financeiro'),
+                NavigationGroup::make('Reservas e Convites'),
+                NavigationGroup::make('Portaria'),
+                NavigationGroup::make('Conteúdo'),
+                NavigationGroup::make('Estoque'),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
-                Dashboard::class,
+                GestaoDashboard::class,
+                ValidarCarteirinha::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([

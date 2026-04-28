@@ -10,6 +10,8 @@ class Dependent extends Model
 
     protected $casts = [
         'birthdate' => 'date',
+        'is_free' => 'boolean',
+        'monthly_fee' => 'decimal:2',
     ];
 
     public function member()

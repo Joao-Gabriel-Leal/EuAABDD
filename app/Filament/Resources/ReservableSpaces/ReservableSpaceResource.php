@@ -20,6 +20,18 @@ class ReservableSpaceResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
+    protected static ?string $slug = 'espacos';
+
+    protected static ?string $modelLabel = 'espaço reservável';
+
+    protected static ?string $pluralModelLabel = 'Espaços';
+
+    protected static ?string $navigationLabel = 'Espaços';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Reservas e Convites';
+
+    protected static ?int $navigationSort = 10;
+
     public static function form(Schema $schema): Schema
     {
         return ReservableSpaceForm::configure($schema);

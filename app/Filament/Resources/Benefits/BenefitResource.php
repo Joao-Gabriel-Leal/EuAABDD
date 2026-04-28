@@ -20,6 +20,18 @@ class BenefitResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
+    protected static ?string $slug = 'beneficios';
+
+    protected static ?string $modelLabel = 'benefício';
+
+    protected static ?string $pluralModelLabel = 'Benefícios';
+
+    protected static ?string $navigationLabel = 'Benefícios';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Conteúdo';
+
+    protected static ?int $navigationSort = 20;
+
     public static function form(Schema $schema): Schema
     {
         return BenefitForm::configure($schema);

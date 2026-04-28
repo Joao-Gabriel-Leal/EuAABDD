@@ -38,7 +38,16 @@ class PlansTable
                     ->numeric()
                     ->sortable(),
                 TextColumn::make('extra_guest_price')
-                    ->money()
+                    ->label('Convite extra')
+                    ->money('BRL')
+                    ->sortable(),
+                TextColumn::make('monthly_due_day')
+                    ->label('Venc.')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('annual_discount_percent')
+                    ->label('Anuidade %')
+                    ->numeric()
                     ->sortable(),
                 IconColumn::make('is_active')
                     ->boolean(),

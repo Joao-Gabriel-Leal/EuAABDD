@@ -1,81 +1,58 @@
 @extends('layouts.club', ['title' => 'Equipe | AABB Brasília'])
 
 @section('content')
+    @php
+        $user = auth()->user();
+        $teamTabs = collect([
+            ['id' => 'visao-geral', 'label' => 'Visão geral', 'area' => 'Painel', 'title' => 'Resumo operacional', 'view' => 'team.partials.overview', 'allowed' => true],
+            ['id' => 'secretaria', 'label' => 'Secretaria', 'area' => 'Base social', 'title' => 'Associados, dependentes e propostas', 'view' => 'team.partials.secretariat', 'allowed' => $user->canManageSecretariat()],
+            ['id' => 'financeiro', 'label' => 'Financeiro', 'area' => 'Receita', 'title' => 'Cobranças, pagamentos e caixa', 'view' => 'team.partials.finance', 'allowed' => $user->canManageFinance()],
+            ['id' => 'reservas', 'label' => 'Reservas e Convites', 'area' => 'Clube', 'title' => 'Churrasqueiras, convidados e cotas', 'view' => 'team.partials.reservations', 'allowed' => $user->hasInternalRole()],
+            ['id' => 'portaria', 'label' => 'Portaria', 'area' => 'Acesso', 'title' => 'Carteirinhas, convites e entradas', 'view' => 'team.partials.access', 'allowed' => $user->canManageAccess()],
+            ['id' => 'estoque', 'label' => 'Estoque', 'area' => 'Operação', 'title' => 'Produtos e movimentações', 'view' => 'team.partials.stock', 'allowed' => $user->hasInternalRole()],
+            ['id' => 'conteudo', 'label' => 'Conteúdo', 'area' => 'Comunicação', 'title' => 'Comunicados e benefícios', 'view' => 'team.partials.content', 'allowed' => $user->canManageSecretariat()],
+        ])->filter(fn ($tab) => $tab['allowed'])->values();
+    @endphp
+
     <section class="team-header">
         <div>
             <p class="overline">Painel da equipe</p>
             <h1>Operação AABB Brasília</h1>
-            <p>Secretaria, financeiro, reservas, convites, estoque e acesso em leitura simples.</p>
+            <p>Tudo que o funcionário precisa em uma única tela: secretaria, financeiro, reservas, portaria, estoque e comunicação.</p>
         </div>
-        <a class="club-button club-button--yellow" href="/admin">Abrir CRUD Filament</a>
     </section>
 
-    <section class="team-metrics">
-        <article><span>Receitas</span><strong>R$ {{ number_format($income, 2, ',', '.') }}</strong></article>
-        <article><span>Despesas</span><strong>R$ {{ number_format($expenses, 2, ',', '.') }}</strong></article>
-        <article><span>Recebido</span><strong>R$ {{ number_format($paidAmount, 2, ',', '.') }}</strong></article>
-        <article><span>Pendente</span><strong>R$ {{ number_format($pendingAmount, 2, ',', '.') }}</strong></article>
-    </section>
-
-    <section class="ops-grid">
-        <article class="ops-panel">
-            <h2>Associados</h2>
-            @foreach($members as $member)
-                <div class="ops-row">
-                    <span>{{ $member->name }} <small>{{ $member->membership_code }}</small></span>
-                    <strong>{{ $member->plan->name }}</strong>
-                </div>
+    <section class="team-workspace" data-team-tabs>
+        <div class="team-tab-nav" role="tablist" aria-label="Módulos da equipe AABB">
+            @foreach($teamTabs as $index => $tab)
+                <button
+                    type="button"
+                    role="tab"
+                    class="team-tab-card {{ $index === 0 ? 'is-active' : '' }}"
+                    id="team-tab-{{ $tab['id'] }}"
+                    aria-controls="team-panel-{{ $tab['id'] }}"
+                    aria-selected="{{ $index === 0 ? 'true' : 'false' }}"
+                    tabindex="{{ $index === 0 ? '0' : '-1' }}"
+                    data-team-tab-target="{{ $tab['id'] }}"
+                >
+                    <span>{{ $tab['area'] }}</span>
+                    <strong>{{ $tab['label'] }}</strong>
+                    <small>{{ $tab['title'] }}</small>
+                </button>
             @endforeach
-        </article>
+        </div>
 
-        <article class="ops-panel">
-            <h2>Financeiro</h2>
-            @foreach($invoices as $invoice)
-                <div class="ops-row">
-                    <span>{{ $invoice->member->name }} <small>{{ $invoice->description }}</small></span>
-                    <strong class="{{ $invoice->status === 'paid' ? 'ok' : 'warn' }}">R$ {{ number_format($invoice->amount, 2, ',', '.') }}</strong>
-                </div>
-            @endforeach
-        </article>
-
-        <article class="ops-panel">
-            <h2>Reservas</h2>
-            @foreach($reservations as $reservation)
-                <div class="ops-row">
-                    <span>{{ $reservation->space->name }} <small>{{ $reservation->member->name }} · {{ $reservation->guests->count() }} convidados</small></span>
-                    <strong>{{ $reservation->reservation_date->format('d/m') }}</strong>
-                </div>
-            @endforeach
-        </article>
-
-        <article class="ops-panel">
-            <h2>Estoque</h2>
-            @foreach($products as $product)
-                <div class="ops-row">
-                    <span>{{ $product->name }} <small>{{ $product->category }}</small></span>
-                    <strong class="{{ $product->quantity < $product->minimum_quantity ? 'warn' : 'ok' }}">{{ $product->quantity }} {{ $product->unit }}</strong>
-                </div>
-            @endforeach
-        </article>
-
-        <article class="ops-panel">
-            <h2>Propostas</h2>
-            @foreach($proposals as $proposal)
-                <div class="ops-row">
-                    <span>{{ $proposal->name }} <small>{{ $proposal->email }}</small></span>
-                    <strong>{{ $proposal->status }}</strong>
-                </div>
-            @endforeach
-        </article>
-
-        <article class="ops-panel">
-            <h2>Portaria</h2>
-            @foreach($accessLogs as $log)
-                <div class="ops-row">
-                    <span>{{ $log->person_name }} <small>{{ $log->gate }}</small></span>
-                    <strong>{{ $log->checked_at->format('H:i') }}</strong>
-                </div>
-            @endforeach
-        </article>
+        @foreach($teamTabs as $index => $tab)
+            <section
+                class="team-tab-panel"
+                id="team-panel-{{ $tab['id'] }}"
+                role="tabpanel"
+                aria-labelledby="team-tab-{{ $tab['id'] }}"
+                data-team-tab-panel="{{ $tab['id'] }}"
+                @if($index !== 0) hidden @endif
+            >
+                @include($tab['view'])
+            </section>
+        @endforeach
     </section>
 @endsection

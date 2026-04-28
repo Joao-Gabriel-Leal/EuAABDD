@@ -53,11 +53,31 @@ class User extends Authenticatable implements FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return in_array($this->role, ['team', 'admin'], true);
+        return $this->hasInternalRole();
     }
 
     public function member()
     {
         return $this->belongsTo(Member::class);
+    }
+
+    public function hasInternalRole(): bool
+    {
+        return in_array($this->role, ['team', 'admin', 'secretaria', 'financeiro', 'portaria', 'diretoria'], true);
+    }
+
+    public function canManageFinance(): bool
+    {
+        return in_array($this->role, ['team', 'admin', 'financeiro', 'diretoria'], true);
+    }
+
+    public function canManageSecretariat(): bool
+    {
+        return in_array($this->role, ['team', 'admin', 'secretaria', 'diretoria'], true);
+    }
+
+    public function canManageAccess(): bool
+    {
+        return in_array($this->role, ['team', 'admin', 'portaria', 'diretoria'], true);
     }
 }

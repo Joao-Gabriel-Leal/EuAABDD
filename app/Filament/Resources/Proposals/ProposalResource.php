@@ -20,6 +20,18 @@ class ProposalResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
+    protected static ?string $slug = 'propostas';
+
+    protected static ?string $modelLabel = 'proposta';
+
+    protected static ?string $pluralModelLabel = 'Propostas';
+
+    protected static ?string $navigationLabel = 'Propostas';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Secretaria';
+
+    protected static ?int $navigationSort = 20;
+
     public static function form(Schema $schema): Schema
     {
         return ProposalForm::configure($schema);

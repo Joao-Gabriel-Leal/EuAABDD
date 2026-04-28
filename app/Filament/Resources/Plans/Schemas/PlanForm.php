@@ -33,10 +33,29 @@ class PlanForm
                     ->numeric()
                     ->default(2),
                 TextInput::make('extra_guest_price')
+                    ->label('Convite excedente')
                     ->required()
                     ->numeric()
                     ->default(28)
-                    ->prefix('$'),
+                    ->prefix('R$'),
+                TextInput::make('monthly_due_day')
+                    ->label('Vencimento padrão')
+                    ->required()
+                    ->numeric()
+                    ->minValue(1)
+                    ->maxValue(28)
+                    ->default(8),
+                TextInput::make('dependent_extra_price')
+                    ->label('Dependente extra')
+                    ->required()
+                    ->numeric()
+                    ->default(0)
+                    ->prefix('R$'),
+                TextInput::make('annual_discount_percent')
+                    ->label('Desconto anuidade (%)')
+                    ->required()
+                    ->numeric()
+                    ->default(0),
                 Toggle::make('is_active')
                     ->required(),
             ]);

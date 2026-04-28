@@ -1,10 +1,10 @@
-@extends('layouts.club', ['title' => 'AABB Brasília | Clube Digital'])
+@extends('layouts.club', ['title' => 'AABB Brasilia | Clube Digital'])
 
 @section('content')
     <section class="club-hero" style="--hero-image: url('https://aabbdf.com.br/wp-content/uploads/2022/09/complexosaquaticos.jpg')">
         <div class="club-hero__content">
-            <p class="overline">Associação Atlética Banco do Brasil</p>
-            <h1>AABB Brasília</h1>
+            <p class="overline">Associacao Atletica Banco do Brasil</p>
+            <h1>AABB Brasilia</h1>
             <p class="hero-copy">Um clube vivo, azul e amarelo, agora com associado, reservas, convites e financeiro no mesmo lugar.</p>
             <div class="hero-actions">
                 <a href="#adesao" class="club-button club-button--yellow">Quero me associar</a>
@@ -12,7 +12,7 @@
             </div>
         </div>
         <div class="club-hero__strip">
-            <span>Complexos aquáticos</span>
+            <span>Complexos aquaticos</span>
             <span>Churrasqueiras</span>
             <span>Esportes</span>
             <span>Eventos</span>
@@ -28,11 +28,11 @@
             </article>
             <article>
                 <strong>R$ {{ number_format($plans->max('monthly_family'), 2, ',', '.') }}</strong>
-                <span>plano familiar de referência</span>
+                <span>plano familiar de referencia</span>
             </article>
             <article>
                 <strong>{{ $spaces->count() }}</strong>
-                <span>espaços e áreas no sistema</span>
+                <span>espacos e areas no sistema</span>
             </article>
             <article>
                 <strong>1</strong>
@@ -44,7 +44,7 @@
     <section class="club-section" id="estrutura">
         <div class="section-title">
             <p class="overline">Estrutura do clube</p>
-            <h2>Quando abre, já dá vontade de estar lá.</h2>
+            <h2>Quando abre, ja da vontade de estar la.</h2>
         </div>
 
         <div class="venue-grid">
@@ -54,7 +54,7 @@
                     <div>
                         <span>{{ ucfirst($space->type) }}</span>
                         <h3>{{ $space->name }}</h3>
-                        <p>{{ $space->location }} · capacidade para {{ $space->capacity }} pessoas.</p>
+                        <p>{{ $space->location }} | capacidade para {{ $space->capacity }} pessoas.</p>
                     </div>
                 </article>
             @endforeach
@@ -72,7 +72,7 @@
     <section class="club-section club-section--blue" id="planos">
         <div class="section-title">
             <p class="overline">Planos e mensalidades</p>
-            <h2>Valores de maio/2026 já no sistema.</h2>
+            <h2>Valores de maio/2026 ja no sistema.</h2>
         </div>
 
         <div class="plans-grid">
@@ -88,7 +88,7 @@
                             <div><dt>Especial</dt><dd>R$ {{ number_format($plan->monthly_special, 2, ',', '.') }}</dd></div>
                         @endif
                     </dl>
-                    <span>{{ $plan->included_guests }} convites/mês · {{ $plan->included_dependents }} dependentes inclusos</span>
+                    <span>{{ $plan->included_guests }} convites/mes | {{ $plan->included_dependents }} dependentes inclusos</span>
                 </article>
             @endforeach
         </div>
@@ -97,7 +97,7 @@
     <section class="club-section" id="comunicados">
         <div class="section-title">
             <p class="overline">Comunicados e eventos</p>
-            <h2>O associado vê notícia, valor e ação no mesmo ambiente.</h2>
+            <h2>O associado ve noticia, valor e acao no mesmo ambiente.</h2>
         </div>
 
         <div class="news-grid">
@@ -117,7 +117,7 @@
     <section class="club-section club-section--benefits">
         <div class="section-title">
             <p class="overline">Clube digital</p>
-            <h2>O sistema completo aparece como serviço do clube.</h2>
+            <h2>O sistema completo aparece como servico do clube.</h2>
         </div>
         <div class="benefit-grid">
             @foreach($benefits as $benefit)
@@ -132,23 +132,34 @@
 
     <section class="club-section join-section" id="adesao">
         <div>
-            <p class="overline">Associe-se</p>
-            <h2>Uma proposta entra direto para a secretaria.</h2>
-            <p>Este fluxo demonstra a adesão pública do clube. No painel interno, a equipe acompanha propostas, documentos e status.</p>
+            <p class="overline">Associe-se agora</p>
+            <h2>Cadastre-se, pague a primeira mensalidade e acesse o clube.</h2>
+            <p>A adesao agora e direta: voce cria sua conta, recebe a cobranca inicial no portal e a carteirinha libera assim que o pagamento for confirmado.</p>
         </div>
         <form class="join-form" action="{{ route('proposal.store') }}" method="POST">
             @csrf
             <label>Nome completo <input name="name" required placeholder="Seu nome"></label>
+            <label>CPF <input name="cpf" data-mask="cpf" inputmode="numeric" maxlength="14" required placeholder="000.000.000-00"></label>
             <label>E-mail <input type="email" name="email" required placeholder="voce@email.com"></label>
-            <label>Telefone <input name="phone" required placeholder="(61) 99999-9999"></label>
-            <label>Plano de interesse
-                <select name="plan_id">
+            <label>Telefone <input name="phone" data-mask="phone" inputmode="numeric" maxlength="15" required placeholder="(61) 99999-9999"></label>
+            <label>Plano
+                <select name="plan_id" required>
                     @foreach($plans as $plan)
                         <option value="{{ $plan->id }}">{{ $plan->name }}</option>
                     @endforeach
                 </select>
             </label>
-            <button class="club-button club-button--blue" type="submit">Enviar interesse</button>
+            <label>Categoria
+                <select name="category" required>
+                    <option value="Familiar">Familiar</option>
+                    <option value="Individual">Individual</option>
+                    <option value="Individual 30 Menos">Individual 30 menos</option>
+                    <option value="Especial">Especial</option>
+                </select>
+            </label>
+            <label>Senha do portal <input type="password" name="password" minlength="8" required placeholder="Minimo 8 caracteres"></label>
+            <label>Confirmar senha <input type="password" name="password_confirmation" minlength="8" required placeholder="Repita sua senha"></label>
+            <button class="club-button club-button--blue" type="submit">Associar e gerar primeira mensalidade</button>
         </form>
     </section>
 @endsection

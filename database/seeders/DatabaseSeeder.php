@@ -40,6 +40,9 @@ class DatabaseSeeder extends Seeder
                 'included_guests' => 4,
                 'included_dependents' => 2,
                 'extra_guest_price' => 28,
+                'monthly_due_day' => 8,
+                'dependent_extra_price' => 35,
+                'annual_discount_percent' => 8,
             ]),
             Plan::create([
                 'name' => 'Comunitario',
@@ -51,6 +54,9 @@ class DatabaseSeeder extends Seeder
                 'included_guests' => 4,
                 'included_dependents' => 2,
                 'extra_guest_price' => 32,
+                'monthly_due_day' => 20,
+                'dependent_extra_price' => 45,
+                'annual_discount_percent' => 10,
             ]),
         ]);
 
@@ -62,7 +68,7 @@ class DatabaseSeeder extends Seeder
                 'capacity' => 32,
                 'base_price' => 380,
                 'image_url' => 'https://aabbdf.com.br/wp-content/uploads/2022/12/Churrasqueira05-scaled.jpg',
-                'rules' => ['lista_obrigatoria' => true, 'pagamento' => 'associado_responsavel'],
+                'rules' => ['lista_obrigatoria' => true, 'pagamento' => 'associado_responsavel', 'included_guests' => 4, 'starts_at' => '12:00', 'ends_at' => '18:00'],
             ]),
             ReservableSpace::create([
                 'name' => 'Espaco Bosque',
@@ -71,7 +77,7 @@ class DatabaseSeeder extends Seeder
                 'capacity' => 80,
                 'base_price' => 720,
                 'image_url' => 'https://aabbdf.com.br/wp-content/uploads/2022/09/camposequadras.jpg',
-                'rules' => ['lista_obrigatoria' => true, 'pagamento' => 'parcial_convidados'],
+                'rules' => ['lista_obrigatoria' => true, 'pagamento' => 'parcial_convidados', 'included_guests' => 8, 'starts_at' => '10:00', 'ends_at' => '22:00'],
             ]),
             ReservableSpace::create([
                 'name' => 'Complexo Aquatico',
@@ -80,7 +86,7 @@ class DatabaseSeeder extends Seeder
                 'capacity' => 120,
                 'base_price' => 0,
                 'image_url' => 'https://aabbdf.com.br/wp-content/uploads/2022/09/complexosaquaticos.jpg',
-                'rules' => ['reserva' => false, 'acesso' => 'beneficio_associado'],
+                'rules' => ['reserva' => false, 'acesso' => 'beneficio_associado', 'included_guests' => 0],
             ]),
         ]);
 
@@ -99,7 +105,7 @@ class DatabaseSeeder extends Seeder
             ['AABB-0002', 'Ana Paula Souza', '222.333.444-55', 'ana.souza@aabb.demo', 'Efetivo', 'Familiar'],
             ['AABB-0003', 'Leonardo Gadelha', '333.444.555-66', 'leo.gadelha@aabb.demo', 'Comunitario', 'Individual'],
             ['AABB-0004', 'Marina Costa', '444.555.666-77', 'marina.costa@aabb.demo', 'Efetivo', 'Individual 30 Menos'],
-        ])->map(function ($data) use ($plans) {
+        ])->map(function ($data, $index) use ($plans) {
             [$code, $name, $cpf, $email, $planName, $category] = $data;
             $plan = $plans->firstWhere('name', $planName);
 
@@ -112,9 +118,12 @@ class DatabaseSeeder extends Seeder
                 'phone' => '(61) 3223-0078',
                 'status' => 'active',
                 'category' => $category,
+                'billing_due_day' => $planName === 'Efetivo' ? 8 : 20,
+                'membership_type' => 'associate',
                 'joined_at' => now()->subMonths(rand(5, 48)),
                 'photo_url' => 'https://ui-avatars.com/api/?name='.urlencode($name).'&background=083b82&color=fff',
                 'address' => ['cidade' => 'Brasilia', 'uf' => 'DF'],
+                'notes' => 'Associado demo com histórico operacional para apresentação.',
             ]);
         });
 
@@ -126,12 +135,35 @@ class DatabaseSeeder extends Seeder
         ]);
 
         User::create([
+            'name' => 'Financeiro AABB',
+            'email' => 'financeiro@aabb.demo',
+            'password' => Hash::make('aabb2026'),
+            'role' => 'financeiro',
+        ]);
+
+        User::create([
+            'name' => 'Secretaria AABB',
+            'email' => 'secretaria@aabb.demo',
+            'password' => Hash::make('aabb2026'),
+            'role' => 'secretaria',
+        ]);
+
+        User::create([
+            'name' => 'Portaria AABB',
+            'email' => 'portaria@aabb.demo',
+            'password' => Hash::make('aabb2026'),
+            'role' => 'portaria',
+        ]);
+
+        User::create([
             'name' => 'Carlos Associado',
             'email' => 'associado@aabb.demo',
             'password' => Hash::make('aabb2026'),
             'role' => 'member',
             'member_id' => $members->first()->id,
         ]);
+
+        $demoBillingMonth = CarbonImmutable::create(2026, 5, 1);
 
         foreach ($members as $index => $member) {
             Dependent::create([
@@ -141,6 +173,9 @@ class DatabaseSeeder extends Seeder
                 'birthdate' => now()->subYears(12 + $index),
                 'relationship' => 'Filho(a)',
                 'status' => 'active',
+                'is_free' => true,
+                'monthly_fee' => 0,
+                'access_status' => 'allowed',
             ]);
 
             $monthlyAmount = $member->category === 'Familiar'
@@ -151,13 +186,16 @@ class DatabaseSeeder extends Seeder
                 'member_id' => $member->id,
                 'number' => 'AABB-2026-05-'.str_pad((string) $member->id, 4, '0', STR_PAD_LEFT),
                 'type' => 'monthly',
+                'billing_month' => $demoBillingMonth->toDateString(),
                 'description' => 'Mensalidade maio/2026 - '.$member->plan->name.' '.$member->category,
                 'amount' => $monthlyAmount,
-                'due_date' => now()->startOfMonth()->addDays(14),
-                'status' => $index === 0 ? 'pending' : 'paid',
+                'due_date' => $demoBillingMonth->setDay($member->dueDay())->toDateString(),
+                'status' => $index === 0 ? 'open' : 'paid',
                 'paid_at' => $index === 0 ? null : now()->subDays($index),
-                'payment_method' => $index === 0 ? 'QR/App' : 'Boleto digital',
-                'metadata' => ['gateway' => 'simulado', 'brb_debito' => $index === 1],
+                'payment_method' => $index === 0 ? 'QR App AABB' : 'Boleto BRB',
+                'issued_at' => now()->subDays(3),
+                'reviewed_at' => $index === 0 ? null : now()->subDays($index),
+                'metadata' => ['gateway' => 'brb_ready', 'brb_debito' => $index === 1],
             ]);
 
             if ($invoice->status === 'paid') {
@@ -166,8 +204,9 @@ class DatabaseSeeder extends Seeder
                     'amount' => $invoice->amount,
                     'method' => $invoice->payment_method,
                     'status' => 'paid',
-                    'transaction_code' => 'SIM-'.Str::upper(Str::random(8)),
+                    'transaction_code' => 'BRB-'.Str::upper(Str::random(8)),
                     'paid_at' => now()->subDays($index),
+                    'received_at' => now()->subDays($index),
                 ]);
             }
         }
@@ -179,9 +218,10 @@ class DatabaseSeeder extends Seeder
             'description' => 'Reserva Churrasqueira Lago Sul com lista de convidados',
             'amount' => 520,
             'due_date' => now()->addDays(3),
-            'status' => 'pending',
-            'payment_method' => 'Pix/QR simulado',
-            'metadata' => ['link_pagamento' => '/portal/pagamentos'],
+            'status' => 'open',
+            'payment_method' => 'QR App AABB',
+            'issued_at' => now(),
+            'metadata' => ['link_pagamento' => '/portal/pagamentos', 'meios_previstos' => ['boleto_brb', 'qr_app', 'cartao_presencial']],
         ]);
 
         $reservation = Reservation::create([
@@ -193,10 +233,12 @@ class DatabaseSeeder extends Seeder
             'ends_at' => '18:00',
             'status' => 'pending_payment',
             'total_amount' => 520,
+            'guest_quota' => 4,
             'notes' => 'Lista aberta para convidados e cobranca vinculada ao associado.',
         ]);
 
         foreach (['Joao Henrique', 'Marina Almeida', 'Pedro Martins', 'Bianca Reis', 'Rafael Lima'] as $i => $guestName) {
+            $code = 'AABB-'.Str::upper(Str::random(8));
             $guest = Guest::create([
                 'reservation_id' => $reservation->id,
                 'member_id' => $members->first()->id,
@@ -205,36 +247,49 @@ class DatabaseSeeder extends Seeder
                 'is_extra' => $i >= 4,
                 'amount' => $i >= 4 ? 28 : 0,
                 'status' => $i >= 4 ? 'awaiting_payment' : 'confirmed',
+                'invitation_code' => $code,
             ]);
 
             Invitation::create([
                 'member_id' => $members->first()->id,
                 'guest_id' => $guest->id,
                 'invoice_id' => $i >= 4 ? $reservationInvoice->id : null,
+                'type' => 'reservation_guest',
+                'code' => $code,
                 'valid_for' => $reservation->reservation_date,
-                'status' => $i >= 4 ? 'extra_pending' : 'used',
+                'status' => $i >= 4 ? 'extra_pending' : 'available',
                 'is_extra' => $i >= 4,
+                'amount' => $i >= 4 ? 28 : 0,
             ]);
         }
 
         foreach ([
-            ['Carvao premium', 'Churrasqueiras', 42, 15, 'saco'],
-            ['Pulseiras de convidados', 'Portaria', 180, 50, 'un'],
-            ['Produtos de limpeza piscina', 'Complexo aquatico', 12, 18, 'un'],
-            ['Agua mineral 500ml', 'Eventos', 320, 100, 'un'],
-        ] as [$name, $category, $quantity, $minimum, $unit]) {
+            ['Carvao premium', 'Churrasqueiras', 42, 15, 'saco', 26.90, 'Almoxarifado das churrasqueiras', 'Distribuidora Brasilia Grill'],
+            ['Pulseiras de convidados', 'Portaria', 180, 50, 'un', 0.42, 'Guarita principal', 'Grafica credenciada'],
+            ['Produtos de limpeza piscina', 'Complexo aquatico', 12, 18, 'un', 38.50, 'Casa de bombas', 'Manutencao piscinas DF'],
+            ['Agua mineral 500ml', 'Eventos', 320, 100, 'un', 1.35, 'Deposito eventos', 'Bebidas Planalto'],
+        ] as $index => [$name, $category, $quantity, $minimum, $unit, $unitCost, $location, $supplier]) {
             $product = Product::create([
                 'name' => $name,
                 'category' => $category,
                 'quantity' => $quantity,
                 'minimum_quantity' => $minimum,
                 'unit' => $unit,
+                'description' => 'Item de uso operacional do clube com controle por QR Code, custo e auditoria.',
+                'location' => $location,
+                'supplier' => $supplier,
+                'unit_cost' => $unitCost,
             ]);
 
             StockMovement::create([
                 'product_id' => $product->id,
+                'movement_code' => 'MOV-DEMO-'.str_pad((string) ($index + 1), 4, '0', STR_PAD_LEFT),
                 'type' => 'entry',
                 'quantity' => $quantity,
+                'quantity_before' => 0,
+                'quantity_after' => $quantity,
+                'unit_cost' => $unitCost,
+                'total_cost' => $quantity * $unitCost,
                 'reason' => 'Carga inicial do demo',
             ]);
         }
@@ -300,6 +355,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'familia.demo@aabb.demo',
             'phone' => '(61) 99999-2026',
             'status' => 'analysis',
+            'signature_status' => 'pending',
             'notes' => 'Lead vindo pelo site publico. Fluxo de proposta demonstrativo.',
         ]);
     }

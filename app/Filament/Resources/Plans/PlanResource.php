@@ -20,6 +20,18 @@ class PlanResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
+    protected static ?string $slug = 'planos';
+
+    protected static ?string $modelLabel = 'plano';
+
+    protected static ?string $pluralModelLabel = 'Planos e categorias';
+
+    protected static ?string $navigationLabel = 'Planos e categorias';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Secretaria';
+
+    protected static ?int $navigationSort = 5;
+
     public static function form(Schema $schema): Schema
     {
         return PlanForm::configure($schema);

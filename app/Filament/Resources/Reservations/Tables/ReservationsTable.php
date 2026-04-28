@@ -6,6 +6,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class ReservationsTable
@@ -14,27 +15,33 @@ class ReservationsTable
     {
         return $table
             ->columns([
-                TextColumn::make('member_id')
-                    ->numeric()
+                TextColumn::make('member.name')
+                    ->label('Associado')
+                    ->searchable()
                     ->sortable(),
-                TextColumn::make('reservable_space_id')
-                    ->numeric()
+                TextColumn::make('space.name')
+                    ->label('Espaço')
+                    ->searchable()
                     ->sortable(),
-                TextColumn::make('invoice_id')
-                    ->numeric()
-                    ->sortable(),
+                TextColumn::make('invoice.number')
+                    ->label('Cobrança')
+                    ->searchable(),
                 TextColumn::make('reservation_date')
+                    ->label('Data')
                     ->date()
                     ->sortable(),
-                TextColumn::make('starts_at')
-                    ->time()
-                    ->sortable(),
-                TextColumn::make('ends_at')
-                    ->time()
-                    ->sortable(),
                 TextColumn::make('status')
-                    ->searchable(),
+                    ->label('Status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'confirmed' => 'success',
+                        'pending_payment' => 'warning',
+                        'cancelled' => 'danger',
+                        default => 'gray',
+                    }),
                 TextColumn::make('total_amount')
+                    ->label('Valor')
+                    ->money('BRL')
                     ->numeric()
                     ->sortable(),
                 TextColumn::make('created_at')
@@ -47,7 +54,12 @@ class ReservationsTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->options([
+                        'pending_payment' => 'Aguardando pagamento',
+                        'confirmed' => 'Confirmada',
+                        'cancelled' => 'Cancelada',
+                    ]),
             ])
             ->recordActions([
                 EditAction::make(),

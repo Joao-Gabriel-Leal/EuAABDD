@@ -20,6 +20,18 @@ class AccessLogResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
+    protected static ?string $slug = 'acessos';
+
+    protected static ?string $modelLabel = 'registro de acesso';
+
+    protected static ?string $pluralModelLabel = 'Acessos';
+
+    protected static ?string $navigationLabel = 'Acessos';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Portaria';
+
+    protected static ?int $navigationSort = 20;
+
     public static function form(Schema $schema): Schema
     {
         return AccessLogForm::configure($schema);

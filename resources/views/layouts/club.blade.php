@@ -26,7 +26,6 @@
                     <a href="{{ route('portal.dashboard') }}">Portal</a>
                 @else
                     <a href="{{ route('team.dashboard') }}">Equipe</a>
-                    <a href="/admin">Filament</a>
                 @endif
                 <form action="{{ route('logout') }}" method="POST">
                     @csrf
@@ -38,11 +37,7 @@
         </nav>
     </header>
 
-    @if(session('proposal_status') || session('portal_status'))
-        <div class="toast-message">
-            {{ session('proposal_status') ?? session('portal_status') }}
-        </div>
-    @endif
+    <x-app-messages />
 
     <main>
         @yield('content')

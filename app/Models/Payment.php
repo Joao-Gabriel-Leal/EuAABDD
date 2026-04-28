@@ -10,10 +10,17 @@ class Payment extends Model
 
     protected $casts = [
         'paid_at' => 'datetime',
+        'received_at' => 'datetime',
+        'amount' => 'decimal:2',
     ];
 
     public function invoice()
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    public function confirmedBy()
+    {
+        return $this->belongsTo(User::class, 'confirmed_by_user_id');
     }
 }

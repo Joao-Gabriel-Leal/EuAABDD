@@ -20,6 +20,18 @@ class ReservationResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
+    protected static ?string $slug = 'reservas';
+
+    protected static ?string $modelLabel = 'reserva';
+
+    protected static ?string $pluralModelLabel = 'Reservas';
+
+    protected static ?string $navigationLabel = 'Reservas';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Reservas e Convites';
+
+    protected static ?int $navigationSort = 20;
+
     public static function form(Schema $schema): Schema
     {
         return ReservationForm::configure($schema);

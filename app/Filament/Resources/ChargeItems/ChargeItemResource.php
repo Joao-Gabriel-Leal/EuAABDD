@@ -20,6 +20,18 @@ class ChargeItemResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
+    protected static ?string $slug = 'itens-de-cobranca';
+
+    protected static ?string $modelLabel = 'item de cobrança';
+
+    protected static ?string $pluralModelLabel = 'Itens de cobrança';
+
+    protected static ?string $navigationLabel = 'Itens de cobrança';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Financeiro';
+
+    protected static ?int $navigationSort = 30;
+
     public static function form(Schema $schema): Schema
     {
         return ChargeItemForm::configure($schema);

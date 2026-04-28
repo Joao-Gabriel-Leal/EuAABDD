@@ -20,6 +20,18 @@ class AnnouncementResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
+    protected static ?string $slug = 'comunicados';
+
+    protected static ?string $modelLabel = 'comunicado';
+
+    protected static ?string $pluralModelLabel = 'Comunicados';
+
+    protected static ?string $navigationLabel = 'Comunicados';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Conteúdo';
+
+    protected static ?int $navigationSort = 10;
+
     public static function form(Schema $schema): Schema
     {
         return AnnouncementForm::configure($schema);

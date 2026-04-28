@@ -20,6 +20,18 @@ class MemberResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
+    protected static ?string $slug = 'associados';
+
+    protected static ?string $modelLabel = 'associado';
+
+    protected static ?string $pluralModelLabel = 'Associados';
+
+    protected static ?string $navigationLabel = 'Associados';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Secretaria';
+
+    protected static ?int $navigationSort = 10;
+
     public static function form(Schema $schema): Schema
     {
         return MemberForm::configure($schema);
