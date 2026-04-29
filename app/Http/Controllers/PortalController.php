@@ -12,6 +12,7 @@ use App\Services\ReservationService;
 use App\Support\BrazilianMasks;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class PortalController extends Controller
 {
@@ -42,11 +43,14 @@ class PortalController extends Controller
         $this->authorizeActiveMember($member);
 
         $data = $request->validate([
-            'reservable_space_id' => ['required', 'exists:reservable_spaces,id'],
+            'reservable_space_id' => [
+                'required',
+                Rule::exists('reservable_spaces', 'id')->where(fn ($query) => $query->where('is_active', true)),
+            ],
             'reservation_date' => ['required', 'date', 'after_or_equal:today'],
         ]);
 
-        $space = ReservableSpace::findOrFail($data['reservable_space_id']);
+        $space = ReservableSpace::where('is_active', true)->findOrFail($data['reservable_space_id']);
         $reservation = $reservations->createReservation($member, $space, $data['reservation_date']);
 
         return back()->with('portal_status', 'Reserva criada com agenda bloqueada e cobranca real vinculada: '.$reservation->invoice->number.'.');

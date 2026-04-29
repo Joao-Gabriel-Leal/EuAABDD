@@ -60,6 +60,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/equipe', [TeamController::class, 'dashboard'])->name('team.dashboard');
     Route::get('/equipe/estoque/produtos/{token}', [TeamController::class, 'showStockProduct'])->name('team.stock.product.show');
     Route::get('/carteirinha/validar/{token}', [MemberCardController::class, 'show'])->name('member-card.verify');
+    Route::post('/equipe/espacos', [TeamController::class, 'storeReservationSpace'])->name('team.spaces.store');
+    Route::put('/equipe/espacos/{space}', [TeamController::class, 'updateReservationSpace'])->name('team.spaces.update');
+    Route::patch('/equipe/espacos/{space}/status', [TeamController::class, 'toggleReservationSpace'])->name('team.spaces.toggle');
     Route::post('/equipe/faturamento/mensalidades', [TeamController::class, 'generateMonthlyInvoices'])->name('team.billing.monthly');
     Route::post('/equipe/faturas/{invoice}/baixa', [TeamController::class, 'markInvoicePaid'])->name('team.invoices.pay');
     Route::post('/equipe/importar-associados', [TeamController::class, 'importMembers'])->name('team.members.import');

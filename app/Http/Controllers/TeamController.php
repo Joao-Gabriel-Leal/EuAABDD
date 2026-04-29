@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\SaveReservableSpaceRequest;
 use App\Models\AccessLog;
 use App\Models\Announcement;
 use App\Models\Benefit;
@@ -23,16 +24,24 @@ use App\Services\MemberImportService;
 use App\Services\StockQrService;
 use App\Services\StockService;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 class TeamController extends Controller
 {
-    public function dashboard(BillingService $billingService, StockQrService $stockQrs)
+    public function dashboard(Request $request, BillingService $billingService, StockQrService $stockQrs)
     {
         $this->authorizeInternal();
         $billingService->markOverdueInvoices();
+        $managedReservationSpaces = ReservableSpace::query()
+            ->orderByDesc('is_active')
+            ->orderBy('name')
+            ->get();
+        $spaceEditor = $request->integer('space')
+            ? $managedReservationSpaces->firstWhere('id', $request->integer('space'))
+            : null;
 
         return view('team.dashboard', [
             'members' => Member::with(['plan', 'dependents'])->latest()->take(10)->get(),
@@ -52,7 +61,9 @@ class TeamController extends Controller
                 ->get(),
             'payments' => Payment::with('invoice.member')->latest('received_at')->latest()->take(8)->get(),
             'reservations' => Reservation::with(['member', 'space', 'guests', 'invoice'])->latest('reservation_date')->take(12)->get(),
-            'reservationSpaces' => ReservableSpace::where('is_active', true)->orderBy('name')->get(),
+            'reservationSpaces' => $managedReservationSpaces->where('is_active', true)->values(),
+            'managedReservationSpaces' => $managedReservationSpaces,
+            'spaceEditor' => $spaceEditor,
             'invitations' => Invitation::with(['member', 'guest', 'invoice'])->latest('valid_for')->take(10)->get(),
             'guests' => Guest::with(['member', 'reservation.space'])->latest()->take(8)->get(),
             'products' => Product::with(['movements' => fn ($query) => $query->latest()->take(4)])
@@ -87,6 +98,41 @@ class TeamController extends Controller
             'todayAccessCount' => AccessLog::whereDate('checked_at', today())->count(),
             'scheduledReservationsCount' => Reservation::whereDate('reservation_date', '>=', today())->count(),
         ]);
+    }
+
+    public function storeReservationSpace(SaveReservableSpaceRequest $request): RedirectResponse
+    {
+        $this->authorizeInternal();
+
+        $space = new ReservableSpace();
+        $this->saveReservationSpace($space, $request);
+
+        return $this->redirectToReservations($space, 'Espaco cadastrado e disponivel para agenda, portal e home.');
+    }
+
+    public function updateReservationSpace(SaveReservableSpaceRequest $request, ReservableSpace $space): RedirectResponse
+    {
+        $this->authorizeInternal();
+
+        $this->saveReservationSpace($space, $request);
+
+        return $this->redirectToReservations($space, 'Espaco atualizado com sucesso para a operacao.');
+    }
+
+    public function toggleReservationSpace(ReservableSpace $space): RedirectResponse
+    {
+        $this->authorizeInternal();
+
+        $space->update([
+            'is_active' => ! $space->is_active,
+        ]);
+
+        return $this->redirectToReservations(
+            null,
+            $space->is_active
+                ? 'Espaco reativado. Ele voltou para o calendario e para o portal.'
+                : 'Espaco desativado. O historico foi preservado e novas reservas foram bloqueadas.',
+        );
     }
 
     public function generateMonthlyInvoices(Request $request, BillingService $billingService)
@@ -258,8 +304,8 @@ class TeamController extends Controller
         }
 
         $selectedReservations = $reservations->get($selectedDate->toDateString(), collect());
-        $startsAt = $space->rules['starts_at'] ?? '12:00';
-        $endsAt = $space->rules['ends_at'] ?? '18:00';
+        $startsAt = $space->startsAt();
+        $endsAt = $space->endsAt();
 
         return response()->json([
             'space' => [
@@ -334,6 +380,53 @@ class TeamController extends Controller
         } catch (\Throwable) {
             return $month->startOfMonth();
         }
+    }
+
+    private function saveReservationSpace(ReservableSpace $space, SaveReservableSpaceRequest $request): void
+    {
+        $validated = $request->validated();
+
+        $space->fill([
+            'name' => $validated['name'],
+            'type' => $validated['type'],
+            'location' => $validated['location'],
+            'capacity' => (int) $validated['capacity'],
+            'base_price' => (float) $validated['base_price'],
+            'image_url' => $this->resolveReservationSpaceImageUrl($request, $space),
+            'is_active' => $request->boolean('is_active'),
+            'rules' => $space->mergeOperationalRules([
+                'starts_at' => $validated['starts_at'],
+                'ends_at' => $validated['ends_at'],
+                'included_guests' => (int) $validated['included_guests'],
+            ]),
+        ]);
+
+        $space->save();
+    }
+
+    private function resolveReservationSpaceImageUrl(SaveReservableSpaceRequest $request, ReservableSpace $space): ?string
+    {
+        if ($request->hasFile('image_file')) {
+            $path = $request->file('image_file')->store('reservable-spaces', 'public');
+
+            return ReservableSpace::normalizeImageUrl($path);
+        }
+
+        if ($request->filled('image_url')) {
+            return $request->string('image_url')->trim()->toString();
+        }
+
+        return $space->getRawOriginal('image_url');
+    }
+
+    private function redirectToReservations(?ReservableSpace $space, string $message): RedirectResponse
+    {
+        $params = $space?->exists ? ['space' => $space->id] : [];
+
+        return redirect()
+            ->to(route('team.dashboard', $params).'#reservas')
+            ->with('team_status', $message)
+            ->with('team_status_type', 'success');
     }
 
     private function authorizeInternal(): void

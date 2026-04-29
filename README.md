@@ -39,6 +39,28 @@ npm run build
 php artisan test
 ```
 
+## Validacao publica gratuita
+
+Para publicar o demo na internet sem migrar o projeto para outra hospedagem, use o launcher abaixo:
+
+```powershell
+.\scripts\publish-public-demo.ps1
+```
+
+Ele sobe o PostgreSQL local se necessario, garante o build do frontend, abre um Quick Tunnel do Cloudflare e gera o resumo pronto para compartilhar em `storage\logs\public-demo-share.txt`.
+
+Observacoes importantes:
+
+- A URL publica e temporaria e muda a cada nova publicacao.
+- Sua maquina precisa ficar ligada e conectada enquanto o chefe estiver validando.
+- O acesso continua usando os logins demo ja cadastrados no sistema.
+
+Para encerrar a publicacao e limpar os processos iniciados pelo launcher:
+
+```powershell
+.\scripts\stop-public-demo.ps1
+```
+
 ## O que esta funcionando
 
 - Home publica com cara de clube AABB: estrutura, planos, comunicados, beneficios, adesao e login.
