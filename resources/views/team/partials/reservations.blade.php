@@ -88,19 +88,21 @@
                 @foreach($managedSpaceTypes as $type)
                     <article class="space-type-chip">
                         <span class="space-type-swatch" style="--pin-color: {{ $type->pin_color }}"></span>
-                        <span>
+                        <span class="space-type-chip__text">
                             <strong>{{ $type->name }}</strong>
                             <small>{{ $type->spaces_count }} espaco(s)</small>
                         </span>
                         <b>{{ $type->is_active ? 'Ativo' : 'Inativo' }}</b>
-                        <a class="mini-button mini-button--light" href="{{ route('team.dashboard', ['space_type' => $type->id]) }}#reservas">Editar</a>
-                        <form method="POST" action="{{ route('team.space-types.toggle', $type) }}">
-                            @csrf
-                            @method('PATCH')
-                            <button class="mini-button {{ $type->is_active ? '' : 'mini-button--light' }}" type="submit">
-                                {{ $type->is_active ? 'Pausar' : 'Ativar' }}
-                            </button>
-                        </form>
+                        <div class="space-type-chip__actions">
+                            <a class="mini-button mini-button--light" href="{{ route('team.dashboard', ['space_type' => $type->id]) }}#reservas">Editar</a>
+                            <form method="POST" action="{{ route('team.space-types.toggle', $type) }}">
+                                @csrf
+                                @method('PATCH')
+                                <button class="mini-button {{ $type->is_active ? '' : 'mini-button--light' }}" type="submit">
+                                    {{ $type->is_active ? 'Pausar' : 'Ativar' }}
+                                </button>
+                            </form>
+                        </div>
                     </article>
                 @endforeach
             </div>
@@ -108,9 +110,11 @@
 
         <section class="reservation-map-manager reservation-map-manager--team" data-reservation-map-upload data-team-space-map>
             <div class="reservation-map-manager__tools">
-                <p class="overline">Mapa de reservas</p>
-                <h3>Planta do clube</h3>
-                <p>Use os pins para localizar, editar ou desativar cada espaco.</p>
+                <div>
+                    <p class="overline">Mapa de reservas</p>
+                    <h3>Planta do clube</h3>
+                    <p>Use os pins para localizar, editar ou desativar cada espaco.</p>
+                </div>
                 <form method="POST" action="{{ route('team.reservation-map.store') }}" enctype="multipart/form-data" class="reservation-map-upload-form">
                     @csrf
                     <label>Imagem da planta
