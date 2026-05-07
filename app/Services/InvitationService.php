@@ -41,7 +41,7 @@ class InvitationService
                     'amount' => $amount,
                     'due_date' => now()->addDays(2)->toDateString(),
                     'status' => 'open',
-                    'payment_method' => 'Boleto BRB / QR App',
+                    'payment_method' => 'Boleto Banco do Brasil / QR App',
                     'issued_at' => now(),
                     'metadata' => ['regra' => 'excedente_cota_mensal'],
                 ]);

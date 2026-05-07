@@ -10,5 +10,6 @@ class Announcement extends Model
 
     protected $casts = [
         'published_at' => 'date',
+        'is_featured' => 'boolean',
     ];
 }

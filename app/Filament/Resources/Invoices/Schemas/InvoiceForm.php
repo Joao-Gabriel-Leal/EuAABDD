@@ -61,8 +61,8 @@ class InvoiceForm
                 Select::make('payment_method')
                     ->label('Meio previsto')
                     ->options([
-                        'Boleto BRB' => 'Boleto BRB',
-                        'Débito em conta BRB' => 'Débito em conta BRB',
+                        'Boleto Banco do Brasil' => 'Boleto Banco do Brasil',
+                        'Débito em conta Banco do Brasil' => 'Débito em conta Banco do Brasil',
                         'QR App AABB' => 'QR App AABB',
                         'Cartão presencial' => 'Cartão presencial',
                     ]),

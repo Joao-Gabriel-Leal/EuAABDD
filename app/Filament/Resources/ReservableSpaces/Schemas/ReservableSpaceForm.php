@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ReservableSpaces\Schemas;
 
 use App\Models\ReservableSpace;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
@@ -16,7 +17,14 @@ class ReservableSpaceForm
             ->components([
                 TextInput::make('name')
                     ->required(),
+                Select::make('reservable_space_type_id')
+                    ->label('Tipo')
+                    ->relationship('spaceType', 'name', fn ($query) => $query->orderBy('name'))
+                    ->searchable()
+                    ->preload()
+                    ->required(),
                 TextInput::make('type')
+                    ->label('Identificador legado')
                     ->required()
                     ->default('churrasqueira'),
                 TextInput::make('location'),
@@ -52,6 +60,25 @@ class ReservableSpaceForm
                     ->required()
                     ->numeric()
                     ->default(ReservableSpace::DEFAULT_INCLUDED_GUESTS),
+                TextInput::make('rules.guest_price')
+                    ->label('Valor por convidado')
+                    ->required()
+                    ->numeric()
+                    ->default(ReservableSpace::DEFAULT_GUEST_PRICE)
+                    ->prefix('R$'),
+                TextInput::make('rules.map_x')
+                    ->label('Mapa X (%)')
+                    ->required()
+                    ->numeric()
+                    ->default(ReservableSpace::DEFAULT_MAP_X),
+                TextInput::make('rules.map_y')
+                    ->label('Mapa Y (%)')
+                    ->required()
+                    ->numeric()
+                    ->default(ReservableSpace::DEFAULT_MAP_Y),
+                TextInput::make('rules.map_note')
+                    ->label('Referencia no mapa')
+                    ->maxLength(255),
                 Toggle::make('is_active')
                     ->required(),
             ]);

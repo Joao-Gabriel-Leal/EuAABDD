@@ -37,8 +37,8 @@
                         <input name="amount" type="number" step="0.01" value="{{ $invoice->amount }}" required>
                         <select name="method" required>
                             <option value="QR App AABB">QR App AABB</option>
-                            <option value="Boleto BRB">Boleto BRB</option>
-                            <option value="Debito em conta BRB">Debito em conta BRB</option>
+                            <option value="Boleto Banco do Brasil">Boleto Banco do Brasil</option>
+                            <option value="Debito em conta Banco do Brasil">Debito em conta Banco do Brasil</option>
                         </select>
                         <input name="paid_at" type="date" value="{{ now()->format('Y-m-d') }}" required>
                         <button class="mini-button" type="submit">Ativar</button>
@@ -64,8 +64,8 @@
                         @csrf
                         <input name="amount" type="number" step="0.01" value="{{ $invoice->amount }}" required>
                         <select name="method" required>
-                            <option value="Boleto BRB">Boleto BRB</option>
-                            <option value="Debito em conta BRB">Debito em conta BRB</option>
+                            <option value="Boleto Banco do Brasil">Boleto Banco do Brasil</option>
+                            <option value="Debito em conta Banco do Brasil">Debito em conta Banco do Brasil</option>
                             <option value="QR App AABB">QR App AABB</option>
                             <option value="Cartao presencial">Cartao presencial</option>
                         </select>

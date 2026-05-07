@@ -1,9 +1,23 @@
+<form method="GET" action="{{ route('team.dashboard') }}" class="team-metrics-filter">
+    <div class="team-metrics-filter__fields">
+        <label>
+            <span>De</span>
+            <input name="metrics_from" type="date" value="{{ $metricsFrom->toDateString() }}" required>
+        </label>
+        <label>
+            <span>Até</span>
+            <input name="metrics_to" type="date" value="{{ $metricsTo->toDateString() }}" required>
+        </label>
+    </div>
+    <button class="mini-button" type="submit">Aplicar</button>
+</form>
+
 <section class="team-metrics team-metrics--inside">
-    <article><span>Associados ativos</span><strong>{{ $membersCount }}</strong></article>
-    <article><span>Recebido</span><strong>R$ {{ number_format($paidAmount, 2, ',', '.') }}</strong></article>
-    <article><span>Aberto/análise</span><strong>R$ {{ number_format($pendingAmount, 2, ',', '.') }}</strong></article>
-    <article><span>Vencido</span><strong>R$ {{ number_format($overdueAmount, 2, ',', '.') }}</strong></article>
-    <article><span>Estoque baixo</span><strong>{{ $lowStockCount }}</strong></article>
+    <article><span>Associados ativos</span><strong>{{ $membersCount }}</strong><small>Situação atual</small></article>
+    <article><span>Recebido no período</span><strong>R$ {{ number_format($paidAmount, 2, ',', '.') }}</strong><small>{{ $metricsPeriodLabel }}</small></article>
+    <article><span>Aberto/análise no período</span><strong>R$ {{ number_format($pendingAmount, 2, ',', '.') }}</strong><small>{{ $metricsPeriodLabel }}</small></article>
+    <article><span>Vencido no período</span><strong>R$ {{ number_format($overdueAmount, 2, ',', '.') }}</strong><small>{{ $metricsPeriodLabel }}</small></article>
+    <article><span>Estoque baixo</span><strong>{{ $lowStockCount }}</strong><small>Situação atual</small></article>
 </section>
 
 <section class="ops-grid ops-grid--inside">

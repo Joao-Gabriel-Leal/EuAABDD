@@ -87,6 +87,11 @@ const formatHumanDate = (value) => parseIsoDate(value).toLocaleDateString('pt-BR
     year: 'numeric',
 });
 
+const formatCurrency = (value) => Number(value || 0).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+});
+
 const findCalendarSpaceSelect = (calendar) => calendar.querySelector('[data-calendar-space]')
     || calendar.closest('form')?.querySelector('[data-calendar-space]');
 
@@ -209,27 +214,83 @@ const setupCopyAndShareButtons = () => {
     });
 };
 
-const activateTeamTab = (workspace, tabId, updateHash = true) => {
-    const target = workspace.querySelector(`[data-team-tab-target="${tabId}"]`);
+const tabWorkspaceConfig = (workspace) => {
+    if (workspace.hasAttribute('data-tab-workspace')) {
+        return {
+            buttonSelector: '[data-tab-target]',
+            panelSelector: '[data-tab-panel]',
+            targetKey: 'tabTarget',
+            panelKey: 'tabPanel',
+        };
+    }
+
+    return {
+        buttonSelector: '[data-team-tab-target]',
+        panelSelector: '[data-team-tab-panel]',
+        targetKey: 'teamTabTarget',
+        panelKey: 'teamTabPanel',
+    };
+};
+
+const activateWorkspaceTab = (workspace, tabId, updateHash = true) => {
+    const config = tabWorkspaceConfig(workspace);
+    const buttons = [...workspace.querySelectorAll(config.buttonSelector)];
+    const target = buttons.find((button) => button.dataset[config.targetKey] === tabId) || buttons[0];
 
     if (! target) {
         return;
     }
 
-    workspace.querySelectorAll('[data-team-tab-target]').forEach((button) => {
+    const activeTab = target.dataset[config.targetKey];
+
+    buttons.forEach((button) => {
         const isActive = button === target;
         button.classList.toggle('is-active', isActive);
         button.setAttribute('aria-selected', String(isActive));
         button.setAttribute('tabindex', isActive ? '0' : '-1');
     });
 
-    workspace.querySelectorAll('[data-team-tab-panel]').forEach((panel) => {
-        panel.hidden = panel.dataset.teamTabPanel !== tabId;
+    workspace.querySelectorAll(config.panelSelector).forEach((panel) => {
+        panel.hidden = panel.dataset[config.panelKey] !== activeTab;
     });
 
     if (updateHash) {
-        history.replaceState(null, '', `#${tabId}`);
+        history.replaceState(null, '', `#${activeTab}`);
     }
+};
+
+const setupTabWorkspace = (workspace) => {
+    const config = tabWorkspaceConfig(workspace);
+    const buttons = [...workspace.querySelectorAll(config.buttonSelector)];
+    const hashTab = window.location.hash.replace('#', '');
+    const hashMatches = buttons.some((button) => button.dataset[config.targetKey] === hashTab);
+    const initialTab = hashMatches
+        ? hashTab
+        : workspace.dataset.defaultTab || buttons[0]?.dataset[config.targetKey];
+
+    activateWorkspaceTab(workspace, initialTab, false);
+
+    buttons.forEach((button, index) => {
+        button.addEventListener('click', () => activateWorkspaceTab(workspace, button.dataset[config.targetKey]));
+        button.addEventListener('keydown', (event) => {
+            if (! ['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) {
+                return;
+            }
+
+            event.preventDefault();
+
+            const nextIndex = event.key === 'Home'
+                ? 0
+                : event.key === 'End'
+                    ? buttons.length - 1
+                    : event.key === 'ArrowRight'
+                        ? (index + 1) % buttons.length
+                        : (index - 1 + buttons.length) % buttons.length;
+
+            buttons[nextIndex].focus();
+            activateWorkspaceTab(workspace, buttons[nextIndex].dataset[config.targetKey]);
+        });
+    });
 };
 
 const setupAccessValidation = (form) => {
@@ -335,8 +396,16 @@ const setupReservationCalendar = (calendar) => {
         slotsRoot.innerHTML = '';
     };
 
-    const fetchCalendar = async () => {
-        setLoading();
+    const markSelectedDay = () => {
+        daysRoot.querySelectorAll('.calendar-day').forEach((button) => {
+            button.classList.toggle('is-selected', button.dataset.date === selectedDate);
+        });
+    };
+
+    const fetchCalendar = async (showLoading = true) => {
+        if (showLoading) {
+            setLoading();
+        }
 
         const params = new URLSearchParams({
             space_id: spaceSelect.value,
@@ -362,7 +431,8 @@ const setupReservationCalendar = (calendar) => {
             hiddenDate.value = date;
         }
 
-        fetchCalendar();
+        markSelectedDay();
+        fetchCalendar(false);
     };
 
     const renderSlots = () => {
@@ -486,6 +556,521 @@ const setupReservationCalendar = (calendar) => {
     fetchCalendar();
 };
 
+const setupReservationBuilder = (form) => {
+    const spaceSelect = form.querySelector('[data-calendar-space]');
+    const pins = [...form.querySelectorAll('[data-space-map-pin]')];
+    const typeFilters = [...form.querySelectorAll('[data-space-type-filter]')];
+    const guestList = form.querySelector('[data-reservation-guest-list]');
+    const addGuestButton = form.querySelector('[data-add-reservation-guest]');
+    const paymentModes = [...form.querySelectorAll('[data-payment-mode]')];
+    const summaryBase = form.querySelector('[data-summary-base]');
+    const summaryGuests = form.querySelector('[data-summary-guests]');
+    const summaryMember = form.querySelector('[data-summary-member]');
+    const summarySplit = form.querySelector('[data-summary-split]');
+
+    if (! spaceSelect) {
+        return;
+    }
+
+    let selectedTypeFilter = 'all';
+
+    const selectedOption = () => spaceSelect.selectedOptions[0];
+
+    const selectedPaymentMode = () => paymentModes.find((input) => input.checked)?.value || 'associado_paga';
+
+    const guestRows = () => guestList ? [...guestList.querySelectorAll('[data-reservation-guest-row]')] : [];
+
+    const guestsWithName = () => guestRows().filter((row) => row.querySelector('[data-guest-name]')?.value.trim());
+
+    const reindexGuests = () => {
+        if (! guestList) {
+            return;
+        }
+
+        guestRows().forEach((row, index) => {
+            row.querySelectorAll('input').forEach((input) => {
+                input.name = input.name.replace(/guests\[\d+]/, `guests[${index}]`);
+            });
+        });
+    };
+
+    const updateEmailRequirements = () => {
+        if (! guestList) {
+            return;
+        }
+
+        const isSplit = selectedPaymentMode() === 'rateio_email';
+
+        guestRows().forEach((row) => {
+            const name = row.querySelector('[data-guest-name]')?.value.trim();
+            const email = row.querySelector('[data-guest-email]');
+
+            if (email) {
+                email.required = isSplit && Boolean(name);
+            }
+        });
+    };
+
+    const updatePins = () => {
+        const selectedId = spaceSelect.value;
+
+        pins.forEach((pin) => {
+            const matchesFilter = selectedTypeFilter === 'all' || pin.dataset.spaceType === selectedTypeFilter;
+
+            pin.hidden = ! matchesFilter;
+            pin.classList.toggle('is-active', pin.dataset.spaceId === selectedId);
+        });
+    };
+
+    const updateTypeFilters = () => {
+        typeFilters.forEach((button) => {
+            button.classList.toggle('is-active', button.dataset.spaceTypeFilter === selectedTypeFilter);
+        });
+    };
+
+    const firstVisibleSpaceId = () => [...spaceSelect.options]
+        .find((option) => selectedTypeFilter === 'all' || option.dataset.spaceType === selectedTypeFilter)
+        ?.value;
+
+    const ensureSelectedSpaceVisible = () => {
+        const option = selectedOption();
+        const isVisible = selectedTypeFilter === 'all' || option?.dataset.spaceType === selectedTypeFilter;
+
+        if (isVisible) {
+            return;
+        }
+
+        const nextId = firstVisibleSpaceId();
+
+        if (nextId) {
+            spaceSelect.value = nextId;
+            spaceSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    };
+
+    const updateSummary = () => {
+        ensureSelectedSpaceVisible();
+        const option = selectedOption();
+        const basePrice = Number(option?.dataset.basePrice || 0);
+        const guestPrice = Number(option?.dataset.guestPrice || 14);
+        const guestCount = guestsWithName().length;
+        const guestTotal = guestCount * guestPrice;
+        const memberTotal = selectedPaymentMode() === 'associado_paga'
+            ? basePrice + guestTotal
+            : basePrice;
+        const splitTotal = selectedPaymentMode() === 'rateio_email' ? guestTotal : 0;
+
+        if (summaryBase) {
+            summaryBase.textContent = formatCurrency(basePrice);
+        }
+
+        if (summaryGuests) {
+            summaryGuests.textContent = `${guestCount} x ${formatCurrency(guestPrice)}`;
+        }
+
+        if (summaryMember) {
+            summaryMember.textContent = `Total ${formatCurrency(memberTotal)}`;
+        }
+
+        if (summarySplit) {
+            summarySplit.textContent = formatCurrency(splitTotal);
+        }
+
+        updateEmailRequirements();
+        updateTypeFilters();
+        updatePins();
+    };
+
+    const makeGuestRow = () => {
+        if (! guestList) {
+            return null;
+        }
+
+        const index = guestRows().length;
+        const row = document.createElement('div');
+        row.className = 'reservation-guest-row';
+        row.dataset.reservationGuestRow = '';
+        row.innerHTML = `
+            <input name="guests[${index}][name]" data-guest-name placeholder="Nome do convidado">
+            <input name="guests[${index}][cpf]" data-mask="cpf" inputmode="numeric" maxlength="14" placeholder="CPF opcional">
+            <input name="guests[${index}][email]" type="email" data-guest-email placeholder="E-mail para rateio">
+            <button class="mini-button mini-button--light" type="button" data-remove-reservation-guest>Remover</button>
+        `;
+
+        row.querySelectorAll('input').forEach((input) => {
+            input.addEventListener('input', () => {
+                if (input.dataset.mask) {
+                    applyMask(input);
+                }
+
+                updateSummary();
+            });
+        });
+
+        row.querySelector('[data-remove-reservation-guest]')?.addEventListener('click', () => {
+            if (guestRows().length === 1) {
+                row.querySelectorAll('input').forEach((input) => {
+                    input.value = '';
+                });
+            } else {
+                row.remove();
+            }
+
+            reindexGuests();
+            updateSummary();
+        });
+
+        return row;
+    };
+
+    guestRows().forEach((row) => {
+        row.querySelectorAll('input').forEach((input) => input.addEventListener('input', updateSummary));
+        row.querySelector('[data-remove-reservation-guest]')?.addEventListener('click', () => {
+            if (guestRows().length === 1) {
+                row.querySelectorAll('input').forEach((input) => {
+                    input.value = '';
+                });
+            } else {
+                row.remove();
+            }
+
+            reindexGuests();
+            updateSummary();
+        });
+    });
+
+    addGuestButton?.addEventListener('click', () => {
+        const row = makeGuestRow();
+
+        if (! row) {
+            return;
+        }
+
+        guestList.appendChild(row);
+        reindexGuests();
+        updateSummary();
+    });
+
+    pins.forEach((pin) => {
+        pin.addEventListener('click', () => {
+            if (! pin.dataset.spaceId || pin.hidden) {
+                return;
+            }
+
+            spaceSelect.value = pin.dataset.spaceId;
+            spaceSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            updateSummary();
+        });
+    });
+
+    typeFilters.forEach((button) => {
+        button.addEventListener('click', () => {
+            selectedTypeFilter = button.dataset.spaceTypeFilter || 'all';
+            updateSummary();
+        });
+    });
+
+    spaceSelect.addEventListener('change', updateSummary);
+    paymentModes.forEach((input) => input.addEventListener('change', updateSummary));
+    updateSummary();
+};
+
+const setupPastReservationsToggle = () => {
+    document.querySelectorAll('[data-toggle-past-reservations]').forEach((button) => {
+        const container = button.closest('.reservation-history');
+        const target = container?.querySelector('[data-past-reservations]');
+
+        if (! target) {
+            return;
+        }
+
+        button.addEventListener('click', () => {
+            const shouldShow = target.hidden;
+            target.hidden = ! shouldShow;
+            button.textContent = shouldShow ? 'Ocultar passadas' : 'Ver passadas';
+        });
+    });
+};
+
+const setupReservationModals = () => {
+    const modals = [...document.querySelectorAll('[data-reservation-modal]')];
+    let activeModal = null;
+
+    modals.forEach((modal) => {
+        document.body.appendChild(modal);
+    });
+
+    const closeModal = () => {
+        if (! activeModal) {
+            return;
+        }
+
+        activeModal.hidden = true;
+        activeModal = null;
+        document.body.classList.remove('modal-open');
+    };
+
+    const openModal = (id) => {
+        const modal = modals.find((candidate) => candidate.dataset.reservationModal === id);
+
+        if (! modal) {
+            return;
+        }
+
+        if (activeModal && activeModal !== modal) {
+            activeModal.hidden = true;
+        }
+
+        activeModal = modal;
+        modal.hidden = false;
+        document.body.classList.add('modal-open');
+        modal.querySelector('[data-close-reservation-modal]')?.focus();
+    };
+
+    document.querySelectorAll('[data-open-reservation-modal]').forEach((button) => {
+        button.addEventListener('click', () => openModal(button.dataset.openReservationModal));
+    });
+
+    modals.forEach((modal) => {
+        modal.querySelectorAll('[data-close-reservation-modal]').forEach((button) => {
+            button.addEventListener('click', closeModal);
+        });
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            closeModal();
+        }
+    });
+};
+
+const setupMapCoordinatePicker = (picker) => {
+    const canvas = picker.querySelector('.map-pin-editor__canvas');
+    const pin = picker.querySelector('[data-map-picker-pin]');
+    const form = picker.closest('form');
+    const inputX = form?.querySelector('[data-map-x-input]');
+    const inputY = form?.querySelector('[data-map-y-input]');
+    const typeSelect = form?.querySelector('[data-space-type-select]');
+    const label = picker.querySelector('[data-map-position-label]');
+
+    if (! canvas || ! pin || ! inputX || ! inputY) {
+        return;
+    }
+
+    const clampPercent = (value) => Math.max(0, Math.min(100, Math.round(value)));
+
+    const movePin = (x, y) => {
+        const nextX = clampPercent(x);
+        const nextY = clampPercent(y);
+
+        inputX.value = String(nextX);
+        inputY.value = String(nextY);
+        pin.style.left = `${nextX}%`;
+        pin.style.top = `${nextY}%`;
+
+        if (label) {
+            label.textContent = `${nextX}%, ${nextY}%`;
+        }
+    };
+
+    const updatePinColor = () => {
+        const color = typeSelect?.selectedOptions?.[0]?.dataset.pinColor;
+
+        if (color) {
+            pin.style.setProperty('--pin-color', color);
+        }
+    };
+
+    canvas.addEventListener('click', (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = ((event.clientX - rect.left) / rect.width) * 100;
+        const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+        movePin(x, y);
+    });
+
+    typeSelect?.addEventListener('change', updatePinColor);
+    updatePinColor();
+    movePin(Number(inputX.value || 50), Number(inputY.value || 50));
+};
+
+const setupSpaceTypeColorForm = (form) => {
+    const input = form.querySelector('[data-pin-color-input]');
+    const preview = form.querySelector('[data-pin-preview]');
+
+    if (! input || ! preview) {
+        return;
+    }
+
+    const updatePreview = () => {
+        preview.style.setProperty('--pin-color', input.value || '#e5163d');
+    };
+
+    form.querySelectorAll('[data-pin-color-choice]').forEach((button) => {
+        button.addEventListener('click', () => {
+            input.value = button.dataset.pinColorChoice || '#e5163d';
+            updatePreview();
+        });
+    });
+
+    input.addEventListener('input', updatePreview);
+    updatePreview();
+};
+
+const setupTeamSpaceMap = (section) => {
+    const pins = [...section.querySelectorAll('[data-team-space-pin]')];
+    const details = [...section.querySelectorAll('[data-team-space-detail]')];
+    const empty = section.querySelector('[data-team-space-empty]');
+
+    if (! pins.length || ! details.length) {
+        return;
+    }
+
+    const selectSpace = (spaceId) => {
+        pins.forEach((pin) => {
+            pin.classList.toggle('is-active', pin.dataset.spaceId === spaceId);
+        });
+
+        details.forEach((detail) => {
+            detail.hidden = detail.dataset.teamSpaceDetail !== spaceId;
+        });
+
+        if (empty) {
+            empty.hidden = true;
+        }
+    };
+
+    pins.forEach((pin) => {
+        pin.addEventListener('click', () => {
+            if (pin.dataset.spaceId) {
+                selectSpace(pin.dataset.spaceId);
+            }
+        });
+    });
+};
+
+const compressReservationMapFile = (file) => new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+
+    image.onload = () => {
+        URL.revokeObjectURL(url);
+
+        const maxSize = 2200;
+        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+
+        canvas.width = width;
+        canvas.height = height;
+
+        if (! context) {
+            reject(new Error('Canvas indisponivel para comprimir a planta.'));
+            return;
+        }
+
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, width, height);
+        context.drawImage(image, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+            if (! blob) {
+                reject(new Error('Nao foi possivel comprimir a planta.'));
+                return;
+            }
+
+            const compressedFile = new File(
+                [blob],
+                file.name.replace(/\.[^.]+$/, '') + '.jpg',
+                { type: 'image/jpeg', lastModified: Date.now() },
+            );
+
+            resolve(compressedFile.size < file.size ? compressedFile : file);
+        }, 'image/jpeg', 0.86);
+    };
+
+    image.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Nao foi possivel ler a imagem da planta.'));
+    };
+
+    image.src = url;
+});
+
+const setupReservationMapUpload = (section) => {
+    const form = section.querySelector('form');
+    const input = form?.querySelector('input[name="reservation_map"]');
+    const button = form?.querySelector('button[type="submit"]');
+    let shouldSubmitNative = false;
+
+    if (! form || ! input) {
+        return;
+    }
+
+    form.addEventListener('submit', async (event) => {
+        if (shouldSubmitNative) {
+            shouldSubmitNative = false;
+            return;
+        }
+
+        const file = input.files?.[0];
+
+        if (! file || file.size <= 1900 * 1024 || ! file.type.startsWith('image/')) {
+            return;
+        }
+
+        event.preventDefault();
+
+        const originalText = button?.textContent;
+
+        if (button) {
+            button.disabled = true;
+            button.textContent = 'Otimizando imagem...';
+        }
+
+        try {
+            const compressedFile = await compressReservationMapFile(file);
+            const transfer = new DataTransfer();
+
+            transfer.items.add(compressedFile);
+            input.files = transfer.files;
+        } catch (error) {
+            console.warn(error);
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = originalText;
+            }
+
+            shouldSubmitNative = true;
+            form.requestSubmit();
+        }
+    });
+};
+
+const setupPlanSelectionButtons = () => {
+    const planSelect = document.querySelector('[data-plan-target]');
+
+    if (! planSelect) {
+        return;
+    }
+
+    document.querySelectorAll('[data-plan-select]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const planId = button.dataset.planSelect;
+
+            if (! planId) {
+                return;
+            }
+
+            planSelect.value = planId;
+            planSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    });
+};
+
 document.addEventListener('input', (event) => {
     if (event.target instanceof HTMLInputElement && event.target.dataset.mask) {
         applyMask(event.target);
@@ -496,35 +1081,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('input[data-mask]').forEach(applyMask);
     document.querySelectorAll('[data-dismissible-message]').forEach(setupDismissibleMessage);
     setupCopyAndShareButtons();
+    setupPlanSelectionButtons();
 
-    document.querySelectorAll('[data-team-tabs]').forEach((workspace) => {
-        const buttons = [...workspace.querySelectorAll('[data-team-tab-target]')];
-        const initialTab = window.location.hash.replace('#', '') || buttons[0]?.dataset.teamTabTarget;
-
-        activateTeamTab(workspace, initialTab, false);
-
-        buttons.forEach((button, index) => {
-            button.addEventListener('click', () => activateTeamTab(workspace, button.dataset.teamTabTarget));
-            button.addEventListener('keydown', (event) => {
-                if (! ['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) {
-                    return;
-                }
-
-                event.preventDefault();
-
-                const nextIndex = event.key === 'Home'
-                    ? 0
-                    : event.key === 'End'
-                        ? buttons.length - 1
-                        : event.key === 'ArrowRight'
-                            ? (index + 1) % buttons.length
-                            : (index - 1 + buttons.length) % buttons.length;
-
-                buttons[nextIndex].focus();
-                activateTeamTab(workspace, buttons[nextIndex].dataset.teamTabTarget);
-            });
-        });
-    });
+    document.querySelectorAll('[data-team-tabs], [data-tab-workspace]').forEach(setupTabWorkspace);
 
     document.querySelectorAll('[data-team-tab-jump]').forEach((button) => {
         button.addEventListener('click', () => {
@@ -532,7 +1091,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const tabId = button.dataset.teamTabJump;
 
             if (workspace && tabId) {
-                activateTeamTab(workspace, tabId);
+                activateWorkspaceTab(workspace, tabId);
                 workspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         });
@@ -560,5 +1119,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('[data-access-validation-form]').forEach(setupAccessValidation);
     document.querySelectorAll('[data-stock-movement-form]').forEach(setupStockMovementForm);
+    document.querySelectorAll('[data-map-picker]').forEach(setupMapCoordinatePicker);
+    document.querySelectorAll('[data-space-type-form]').forEach(setupSpaceTypeColorForm);
+    document.querySelectorAll('[data-team-space-map]').forEach(setupTeamSpaceMap);
+    document.querySelectorAll('[data-reservation-map-upload]').forEach(setupReservationMapUpload);
+    document.querySelectorAll('[data-reservation-builder]').forEach(setupReservationBuilder);
     document.querySelectorAll('[data-reservation-calendar]').forEach(setupReservationCalendar);
+    setupPastReservationsToggle();
+    setupReservationModals();
 });

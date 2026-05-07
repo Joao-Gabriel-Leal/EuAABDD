@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\ReservableSpace;
+use App\Models\ReservableSpaceType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request as HttpRequest;
@@ -137,6 +138,162 @@ class LoginAndReservationSpaceManagementTest extends TestCase
         $this->assertSame('08:00', $space->startsAt());
         $this->assertSame('18:00', $space->endsAt());
         $this->assertSame(6, $space->includedGuests());
+    }
+
+    public function test_internal_team_can_create_space_type_and_use_its_pin_color(): void
+    {
+        $team = User::where('email', 'equipe@aabb.demo')->firstOrFail();
+        $member = User::where('email', 'associado@aabb.demo')->firstOrFail();
+
+        $this->actingAs($team)
+            ->post(route('team.space-types.store'), [
+                'name' => 'Salao Nobre',
+                'slug' => 'salao-nobre',
+                'pin_color' => '#7c3aed',
+                'is_active' => '1',
+            ])
+            ->assertRedirect();
+
+        $type = ReservableSpaceType::where('slug', 'salao-nobre')->firstOrFail();
+
+        $this->actingAs($team)
+            ->post(route('team.spaces.store'), [
+                'name' => 'Salao Nobre Social',
+                'reservable_space_type_id' => $type->id,
+                'location' => 'Bloco social',
+                'capacity' => 120,
+                'base_price' => 980,
+                'image_url' => 'https://example.com/salao-nobre.jpg',
+                'starts_at' => '09:00',
+                'ends_at' => '23:00',
+                'included_guests' => 12,
+                'is_active' => '1',
+            ])
+            ->assertRedirect();
+
+        $space = ReservableSpace::where('name', 'Salao Nobre Social')->firstOrFail();
+
+        $this->assertSame($type->id, $space->reservable_space_type_id);
+        $this->assertSame('salao-nobre', $space->type);
+        $this->assertSame('#7c3aed', $space->pinColor());
+
+        $this->actingAs($member)
+            ->get(route('portal.dashboard'))
+            ->assertOk()
+            ->assertSee('data-space-type-filter="salao-nobre"', false)
+            ->assertSee('style="--pin-color: #7c3aed;"', false)
+            ->assertSee('data-space-type="salao-nobre"', false);
+    }
+
+    public function test_space_type_color_updates_are_reflected_on_team_and_portal_maps(): void
+    {
+        $team = User::where('email', 'equipe@aabb.demo')->firstOrFail();
+        $member = User::where('email', 'associado@aabb.demo')->firstOrFail();
+        $type = ReservableSpaceType::where('slug', 'churrasqueira')->firstOrFail();
+
+        $this->actingAs($team)
+            ->put(route('team.space-types.update', $type), [
+                'name' => 'Churrasqueira premium',
+                'slug' => 'churrasqueira',
+                'pin_color' => '#123abc',
+                'is_active' => '1',
+            ])
+            ->assertRedirect(route('team.dashboard', ['space_type' => $type->id]).'#reservas');
+
+        $this->actingAs($team)
+            ->get(route('team.dashboard').'#reservas')
+            ->assertOk()
+            ->assertSee('#123abc', false)
+            ->assertSee('Churrasqueira premium');
+
+        $this->actingAs($member)
+            ->get(route('portal.dashboard'))
+            ->assertOk()
+            ->assertSee('#123abc', false)
+            ->assertSee('Churrasqueira premium');
+    }
+
+    public function test_space_type_rejects_invalid_pin_color(): void
+    {
+        $team = User::where('email', 'equipe@aabb.demo')->firstOrFail();
+
+        $this->actingAs($team)
+            ->post(route('team.space-types.store'), [
+                'name' => 'Cor invalida',
+                'slug' => 'cor-invalida',
+                'pin_color' => 'vermelho',
+                'is_active' => '1',
+            ])
+            ->assertSessionHasErrors('pin_color');
+    }
+
+    public function test_seeded_legacy_space_types_are_backfilled_for_pin_catalog(): void
+    {
+        $this->assertDatabaseHas('reservable_space_types', [
+            'slug' => 'churrasqueira',
+            'pin_color' => '#e65a24',
+        ]);
+        $this->assertDatabaseHas('reservable_space_types', [
+            'slug' => 'evento',
+            'pin_color' => '#d89b12',
+        ]);
+        $this->assertDatabaseHas('reservable_space_types', [
+            'slug' => 'lazer',
+            'pin_color' => '#0ea5c6',
+        ]);
+
+        ReservableSpace::all()->each(function (ReservableSpace $space): void {
+            $this->assertNotNull($space->reservable_space_type_id);
+            $this->assertSame($space->spaceType->slug, $space->type);
+        });
+    }
+
+    public function test_space_crud_form_is_collapsed_until_create_or_edit_is_requested(): void
+    {
+        $team = User::where('email', 'equipe@aabb.demo')->firstOrFail();
+        $space = ReservableSpace::firstOrFail();
+
+        $this->actingAs($team)
+            ->get(route('team.dashboard').'#reservas')
+            ->assertOk()
+            ->assertSee('Cadastrar espaco')
+            ->assertSee('data-team-space-map', false)
+            ->assertSee('data-team-space-pin', false)
+            ->assertSee('data-team-space-empty', false)
+            ->assertSee('<details class="ops-collapsible spaces-fallback">', false)
+            ->assertDontSee('<details class="ops-collapsible spaces-fallback" open', false)
+            ->assertSee('Ver lista completa de espacos')
+            ->assertDontSee('name="_team_form" value="space"', false);
+
+        $this->actingAs($team)
+            ->get(route('team.dashboard', ['create' => 'space']).'#reservas')
+            ->assertOk()
+            ->assertSee('Novo espaco reservavel')
+            ->assertSee('name="_team_form" value="space"', false);
+
+        $this->actingAs($team)
+            ->get(route('team.dashboard', ['space' => $space->id]).'#reservas')
+            ->assertOk()
+            ->assertSee('Editar espaco')
+            ->assertSee('name="_team_form" value="space"', false);
+    }
+
+    public function test_space_form_uses_visual_map_picker_instead_of_manual_coordinates(): void
+    {
+        $team = User::where('email', 'equipe@aabb.demo')->firstOrFail();
+        $space = ReservableSpace::where('type', 'churrasqueira')->firstOrFail();
+
+        $this->actingAs($team)
+            ->get(route('team.dashboard', ['space' => $space->id]).'#reservas')
+            ->assertOk()
+            ->assertSee('data-reservation-map-upload', false)
+            ->assertSee('data-map-picker', false)
+            ->assertSee('data-map-x-input', false)
+            ->assertSee('data-map-y-input', false)
+            ->assertSee('name="map_x" type="hidden"', false)
+            ->assertSee('name="map_y" type="hidden"', false)
+            ->assertDontSee('Posicao no mapa X (%)')
+            ->assertDontSee('Posicao no mapa Y (%)');
     }
 
     public function test_space_updates_reflect_in_calendar_and_deactivation_preserves_history(): void
@@ -277,5 +434,32 @@ class LoginAndReservationSpaceManagementTest extends TestCase
             ->get(route('portal.dashboard'))
             ->assertOk()
             ->assertSee($space->image_url, false);
+    }
+
+    public function test_internal_team_can_upload_reservation_floorplan_map(): void
+    {
+        Storage::fake('public');
+
+        $team = User::where('email', 'equipe@aabb.demo')->firstOrFail();
+        $member = User::where('email', 'associado@aabb.demo')->firstOrFail();
+
+        $this->actingAs($team)
+            ->post(route('team.reservation-map.store'), [
+                'reservation_map' => UploadedFile::fake()->image('planta-clube.png', 1400, 900),
+            ])
+            ->assertRedirect(route('team.dashboard').'#reservas')
+            ->assertSessionHas('team_status');
+
+        Storage::disk('public')->assertExists('club-map/reservation-map.png');
+
+        $this->actingAs($team)
+            ->get(route('team.dashboard').'#reservas')
+            ->assertOk()
+            ->assertSee('/storage/club-map/reservation-map.png', false);
+
+        $this->actingAs($member)
+            ->get(route('portal.dashboard'))
+            ->assertOk()
+            ->assertSee('/storage/club-map/reservation-map.png', false);
     }
 }

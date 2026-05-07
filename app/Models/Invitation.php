@@ -36,6 +36,7 @@ class Invitation extends Model
         return match ($this->status) {
             'available' => 'Disponivel',
             'used' => 'Usado',
+            'payment_pending' => 'Aguardando pagamento',
             'extra_pending' => 'Excedente pendente',
             'cancelled' => 'Cancelado',
             default => ucfirst(str_replace('_', ' ', (string) $this->status)),
@@ -45,5 +46,20 @@ class Invitation extends Model
     public function shareText(): string
     {
         return "Convite AABB Brasilia para {$this->guest?->name}. Codigo: {$this->code}. Valido em {$this->valid_for->format('d/m/Y')}. Apresente este codigo na portaria.";
+    }
+
+    public function whatsappUrl(): ?string
+    {
+        $phone = preg_replace('/\D+/', '', (string) $this->sent_to_phone) ?? '';
+
+        if ($phone === '') {
+            return null;
+        }
+
+        if (! str_starts_with($phone, '55')) {
+            $phone = '55'.$phone;
+        }
+
+        return 'https://wa.me/'.$phone.'?text='.rawurlencode($this->shareText());
     }
 }

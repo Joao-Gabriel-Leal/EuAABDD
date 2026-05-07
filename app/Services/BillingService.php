@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Mail\ClubInvitationMail;
 use App\Models\CashEntry;
 use App\Models\Invoice;
 use App\Models\Member;
@@ -11,6 +12,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -22,13 +24,14 @@ class BillingService
         $created = collect();
 
         Member::query()
-            ->with('plan')
+            ->with(['plan', 'activeDependents'])
             ->where('status', 'active')
             ->whereNotNull('plan_id')
             ->orderBy('membership_code')
             ->chunk(100, function ($members) use ($billingMonth, $created) {
                 foreach ($members as $member) {
-                    $amount = $member->monthlyAmount();
+                    $dependentExtraAmount = (float) $member->activeDependents->sum(fn ($dependent): float => (float) $dependent->monthly_fee);
+                    $amount = $member->monthlyAmount() + $dependentExtraAmount;
 
                     if ($amount <= 0) {
                         continue;
@@ -53,12 +56,13 @@ class BillingService
                             'amount' => $amount,
                             'due_date' => $dueDate->toDateString(),
                             'status' => $dueDate->isPast() ? 'overdue' : 'open',
-                            'payment_method' => 'Boleto BRB / QR App',
+                            'payment_method' => 'Boleto Banco do Brasil / QR App',
                             'issued_at' => now(),
                             'metadata' => [
-                                'meios_previstos' => ['boleto_brb', 'debito_brb', 'qr_app'],
+                                'meios_previstos' => ['boleto_banco_do_brasil', 'debito_banco_do_brasil', 'qr_app'],
                                 'categoria' => $member->category,
                                 'vencimento' => $dueDay,
+                                'valor_dependentes' => $dependentExtraAmount,
                             ],
                         ]);
 
@@ -156,6 +160,8 @@ class BillingService
 
     private function activateLinkedRecords(Invoice $invoice): void
     {
+        $invoice->loadMissing(['reservation', 'invitations.guest']);
+
         if ($invoice->type === 'membership_initial' && $invoice->member?->status === 'pending_payment') {
             $invoice->member->update(['status' => 'active']);
         }
@@ -168,6 +174,21 @@ class BillingService
         $invoice->invitations()->update([
             'status' => 'available',
         ]);
+
+        foreach ($invoice->invitations as $invitation) {
+            $invitation->guest?->update([
+                'status' => 'confirmed',
+            ]);
+
+            if (
+                $invitation->type === 'reservation_guest'
+                && $invitation->sent_to_email
+                && ! $invitation->emailed_at
+            ) {
+                Mail::to($invitation->sent_to_email)->send(new ClubInvitationMail($invitation->loadMissing('guest')));
+                $invitation->update(['emailed_at' => now()]);
+            }
+        }
     }
 
     private function registerCashEntry(Invoice $invoice, Payment $payment): void
@@ -176,6 +197,7 @@ class BillingService
             'type' => 'income',
             'category' => match ($invoice->type) {
                 'reservation' => 'Reservas',
+                'reservation_guest' => 'Reservas',
                 'invitation' => 'Convites',
                 'monthly', 'membership_initial' => 'Mensalidades',
                 default => 'Cobranças avulsas',

@@ -13,20 +13,27 @@ use App\Models\Invitation;
 use App\Models\Invoice;
 use App\Models\Member;
 use App\Models\Payment;
+use App\Models\Plan;
 use App\Models\Product;
 use App\Models\Proposal;
 use App\Models\ReservableSpace;
+use App\Models\ReservableSpaceType;
 use App\Models\Reservation;
 use App\Models\StockMovement;
 use App\Services\AccessService;
 use App\Services\BillingService;
 use App\Services\MemberImportService;
+use App\Services\ProposalService;
 use App\Services\StockQrService;
 use App\Services\StockService;
+use App\Support\BrazilianMasks;
+use App\Support\ReservationMap;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class TeamController extends Controller
@@ -34,16 +41,40 @@ class TeamController extends Controller
     public function dashboard(Request $request, BillingService $billingService, StockQrService $stockQrs)
     {
         $this->authorizeInternal();
+        $user = $request->user();
         $billingService->markOverdueInvoices();
         $managedReservationSpaces = ReservableSpace::query()
+            ->with('spaceType')
             ->orderByDesc('is_active')
             ->orderBy('name')
             ->get();
         $spaceEditor = $request->integer('space')
             ? $managedReservationSpaces->firstWhere('id', $request->integer('space'))
             : null;
+        $managedSpaceTypes = ReservableSpaceType::query()
+            ->withCount('spaces')
+            ->orderByDesc('is_active')
+            ->orderBy('name')
+            ->get();
+        $spaceTypeEditor = $request->integer('space_type')
+            ? $managedSpaceTypes->firstWhere('id', $request->integer('space_type'))
+            : null;
+        $metricsPeriod = $this->dashboardMetricsPeriod($request);
+        $metricsFrom = $metricsPeriod['from'];
+        $metricsTo = $metricsPeriod['to'];
+        $metricsPeriodLabel = $metricsFrom->format('d/m/Y').' a '.$metricsTo->format('d/m/Y');
+        $proposalEditor = $user->canManageSecretariat() && $request->integer('proposal')
+            ? Proposal::with('plan')->find($request->integer('proposal'))
+            : null;
+        $announcementEditor = $user->canManageSecretariat() && $request->integer('announcement')
+            ? Announcement::find($request->integer('announcement'))
+            : null;
+        $benefitEditor = $user->canManageSecretariat() && $request->integer('benefit')
+            ? Benefit::find($request->integer('benefit'))
+            : null;
 
         return view('team.dashboard', [
+            'plans' => Plan::where('is_active', true)->orderBy('name')->get(),
             'members' => Member::with(['plan', 'dependents'])->latest()->take(10)->get(),
             'pendingSignups' => Member::with(['plan', 'invoices'])
                 ->where('status', 'pending_payment')
@@ -52,6 +83,7 @@ class TeamController extends Controller
                 ->get(),
             'dependents' => Dependent::with('member')->latest()->take(10)->get(),
             'proposals' => Proposal::with('plan')->latest()->take(8)->get(),
+            'proposalEditor' => $proposalEditor,
             'invoices' => Invoice::with(['member', 'payments'])->latest('due_date')->take(12)->get(),
             'initialSignupInvoices' => Invoice::with('member')
                 ->where('type', 'membership_initial')
@@ -60,9 +92,12 @@ class TeamController extends Controller
                 ->take(8)
                 ->get(),
             'payments' => Payment::with('invoice.member')->latest('received_at')->latest()->take(8)->get(),
-            'reservations' => Reservation::with(['member', 'space', 'guests', 'invoice'])->latest('reservation_date')->take(12)->get(),
+            'reservations' => Reservation::with(['member', 'space', 'guests.invitation', 'invoice'])->latest('reservation_date')->take(12)->get(),
             'reservationSpaces' => $managedReservationSpaces->where('is_active', true)->values(),
             'managedReservationSpaces' => $managedReservationSpaces,
+            'managedSpaceTypes' => $managedSpaceTypes,
+            'spaceTypeEditor' => $spaceTypeEditor,
+            'reservationMapUrl' => ReservationMap::url(),
             'spaceEditor' => $spaceEditor,
             'invitations' => Invitation::with(['member', 'guest', 'invoice'])->latest('valid_for')->take(10)->get(),
             'guests' => Guest::with(['member', 'reservation.space'])->latest()->take(8)->get(),
@@ -75,13 +110,24 @@ class TeamController extends Controller
             ]),
             'accessLogs' => AccessLog::latest('checked_at')->take(10)->get(),
             'announcements' => Announcement::latest('published_at')->take(6)->get(),
+            'announcementEditor' => $announcementEditor,
             'benefits' => Benefit::latest()->take(6)->get(),
+            'benefitEditor' => $benefitEditor,
             'cashEntries' => CashEntry::latest('entry_date')->take(8)->get(),
             'income' => CashEntry::where('type', 'income')->sum('amount'),
             'expenses' => CashEntry::where('type', 'expense')->sum('amount'),
-            'pendingAmount' => Invoice::whereIn('status', ['open', 'pending', 'awaiting_review'])->sum('amount'),
-            'overdueAmount' => Invoice::where('status', 'overdue')->sum('amount'),
-            'paidAmount' => Invoice::where('status', 'paid')->sum('amount'),
+            'pendingAmount' => Invoice::whereIn('status', ['open', 'pending', 'awaiting_review'])
+                ->whereBetween('due_date', [$metricsFrom->toDateString(), $metricsTo->toDateString()])
+                ->sum('amount'),
+            'overdueAmount' => Invoice::where('status', 'overdue')
+                ->whereBetween('due_date', [$metricsFrom->toDateString(), $metricsTo->toDateString()])
+                ->sum('amount'),
+            'paidAmount' => Payment::where('status', 'paid')
+                ->whereBetween('received_at', [$metricsFrom->startOfDay(), $metricsTo->endOfDay()])
+                ->sum('amount'),
+            'metricsFrom' => $metricsFrom,
+            'metricsTo' => $metricsTo,
+            'metricsPeriodLabel' => $metricsPeriodLabel,
             'membersCount' => Member::where('status', 'active')->count(),
             'lowStockCount' => Product::whereColumn('quantity', '<', 'minimum_quantity')->count(),
             'zeroStockCount' => Product::where('quantity', '<=', 0)->count(),
@@ -98,6 +144,40 @@ class TeamController extends Controller
             'todayAccessCount' => AccessLog::whereDate('checked_at', today())->count(),
             'scheduledReservationsCount' => Reservation::whereDate('reservation_date', '>=', today())->count(),
         ]);
+    }
+
+    private function dashboardMetricsPeriod(Request $request): array
+    {
+        $defaultFrom = CarbonImmutable::now()->startOfMonth();
+        $defaultTo = CarbonImmutable::now()->endOfMonth();
+
+        if (! $request->filled('metrics_from') || ! $request->filled('metrics_to')) {
+            return ['from' => $defaultFrom, 'to' => $defaultTo];
+        }
+
+        $from = $this->dashboardMetricDate($request->string('metrics_from')->toString());
+        $to = $this->dashboardMetricDate($request->string('metrics_to')->toString());
+
+        if (! $from || ! $to || $from->greaterThan($to)) {
+            return ['from' => $defaultFrom, 'to' => $defaultTo];
+        }
+
+        return ['from' => $from, 'to' => $to];
+    }
+
+    private function dashboardMetricDate(string $date): ?CarbonImmutable
+    {
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return null;
+        }
+
+        try {
+            $parsed = CarbonImmutable::createFromFormat('Y-m-d', $date)->startOfDay();
+
+            return $parsed->toDateString() === $date ? $parsed : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function storeReservationSpace(SaveReservableSpaceRequest $request): RedirectResponse
@@ -133,6 +213,69 @@ class TeamController extends Controller
                 ? 'Espaco reativado. Ele voltou para o calendario e para o portal.'
                 : 'Espaco desativado. O historico foi preservado e novas reservas foram bloqueadas.',
         );
+    }
+
+    public function storeReservationSpaceType(Request $request): RedirectResponse
+    {
+        $this->authorizeInternal();
+
+        $spaceType = new ReservableSpaceType();
+        $this->saveReservationSpaceType($spaceType, $request);
+
+        return $this->redirectToReservations(
+            ['space_type' => $spaceType->id],
+            'Tipo de espaco cadastrado com cor de pin pronta para o mapa.',
+        );
+    }
+
+    public function updateReservationSpaceType(Request $request, ReservableSpaceType $spaceType): RedirectResponse
+    {
+        $this->authorizeInternal();
+
+        $this->saveReservationSpaceType($spaceType, $request);
+
+        return $this->redirectToReservations(
+            ['space_type' => $spaceType->id],
+            'Tipo de espaco atualizado e aplicado aos pins vinculados.',
+        );
+    }
+
+    public function toggleReservationSpaceType(ReservableSpaceType $spaceType): RedirectResponse
+    {
+        $this->authorizeInternal();
+
+        $spaceType->update([
+            'is_active' => ! $spaceType->is_active,
+        ]);
+
+        return $this->redirectToReservations(
+            [],
+            $spaceType->is_active
+                ? 'Tipo de espaco reativado para novos cadastros.'
+                : 'Tipo de espaco desativado. Os espacos existentes mantem historico e cor.',
+        );
+    }
+
+    public function uploadReservationMap(Request $request): RedirectResponse
+    {
+        $this->authorizeInternal();
+
+        $data = $request->validate([
+            'reservation_map' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:20480'],
+        ], [
+            'reservation_map.required' => 'Envie a imagem da planta do clube.',
+            'reservation_map.uploaded' => 'A imagem nao chegou ao servidor. Use JPG, PNG ou WebP menor que o limite do servidor.',
+            'reservation_map.image' => 'A planta precisa ser uma imagem valida.',
+            'reservation_map.mimes' => 'Use uma imagem JPG, PNG ou WebP para a planta.',
+            'reservation_map.max' => 'A planta pode ter no maximo 20 MB.',
+        ]);
+
+        ReservationMap::store($data['reservation_map']);
+
+        return redirect()
+            ->to(route('team.dashboard').'#reservas')
+            ->with('team_status', 'Planta do clube atualizada para reservas e portal.')
+            ->with('team_status_type', 'success');
     }
 
     public function generateMonthlyInvoices(Request $request, BillingService $billingService)
@@ -179,6 +322,103 @@ class TeamController extends Controller
         $batch = $imports->import($data['file'], Auth::user());
 
         return back()->with('team_status', "Importação concluída: {$batch->success_rows} sucesso(s), {$batch->failed_rows} erro(s).");
+    }
+
+    public function storeProposal(Request $request): RedirectResponse
+    {
+        $this->authorizeSecretariat();
+
+        $proposal = new Proposal();
+        $this->saveProposal($proposal, $request);
+
+        return $this->redirectToSecretariat($proposal, 'Proposta manual cadastrada para analise da secretaria.');
+    }
+
+    public function updateProposal(Request $request, Proposal $proposal): RedirectResponse
+    {
+        $this->authorizeSecretariat();
+
+        $this->saveProposal($proposal, $request);
+
+        return $this->redirectToSecretariat($proposal, 'Proposta manual atualizada.');
+    }
+
+    public function approveProposal(Proposal $proposal, ProposalService $proposals): RedirectResponse
+    {
+        $this->authorizeSecretariat();
+
+        $member = $proposals->approveAndConvert($proposal, Auth::user());
+
+        return $this->redirectToSecretariat(
+            $proposal,
+            'Proposta aprovada e convertida no associado '.$member->membership_code.'.',
+        );
+    }
+
+    public function signProposal(Proposal $proposal): RedirectResponse
+    {
+        $this->authorizeSecretariat();
+
+        if ($proposal->status !== 'approved') {
+            return $this->redirectToSecretariat($proposal, 'Apenas propostas aprovadas podem ser marcadas como assinadas.', 'warning');
+        }
+
+        $proposal->update([
+            'signature_status' => 'signed',
+            'signed_at' => now(),
+        ]);
+
+        return $this->redirectToSecretariat($proposal, 'Assinatura da proposta registrada.');
+    }
+
+    public function storeAnnouncement(Request $request): RedirectResponse
+    {
+        $this->authorizeSecretariat();
+
+        $announcement = Announcement::create($this->announcementData($request));
+
+        return $this->redirectToContent(['announcement' => $announcement->id], 'Comunicado cadastrado.');
+    }
+
+    public function updateAnnouncement(Request $request, Announcement $announcement): RedirectResponse
+    {
+        $this->authorizeSecretariat();
+
+        $announcement->update($this->announcementData($request, $announcement));
+
+        return $this->redirectToContent(['announcement' => $announcement->id], 'Comunicado atualizado.');
+    }
+
+    public function storeBenefit(Request $request): RedirectResponse
+    {
+        $this->authorizeSecretariat();
+
+        $benefit = Benefit::create($this->benefitData($request));
+
+        return $this->redirectToContent(['benefit' => $benefit->id], 'Beneficio cadastrado.');
+    }
+
+    public function updateBenefit(Request $request, Benefit $benefit): RedirectResponse
+    {
+        $this->authorizeSecretariat();
+
+        $benefit->update($this->benefitData($request));
+
+        return $this->redirectToContent(['benefit' => $benefit->id], 'Beneficio atualizado.');
+    }
+
+    public function toggleBenefit(Benefit $benefit): RedirectResponse
+    {
+        $this->authorizeSecretariat();
+
+        $benefit->update([
+            'is_active' => ! $benefit->is_active,
+        ]);
+
+        return $this->redirectToContent(
+            [],
+            $benefit->is_active ? 'Beneficio ativado na comunicacao.' : 'Beneficio desativado sem apagar historico.',
+        );
     }
 
     public function moveStock(Request $request, Product $product, StockService $stock)
@@ -311,8 +551,16 @@ class TeamController extends Controller
             'space' => [
                 'id' => $space->id,
                 'name' => $space->name,
+                'type' => $space->typeSlug(),
+                'type_name' => $space->typeName(),
+                'pin_color' => $space->pinColor(),
                 'base_price' => (float) $space->base_price,
+                'guest_price' => $space->guestPrice(),
                 'capacity' => $space->capacity,
+                'image_url' => $space->image_url,
+                'map_x' => $space->mapX(),
+                'map_y' => $space->mapY(),
+                'map_note' => $space->mapNote(),
             ],
             'month' => $month->format('Y-m'),
             'monthLabel' => $month->translatedFormat('F Y'),
@@ -385,10 +633,12 @@ class TeamController extends Controller
     private function saveReservationSpace(ReservableSpace $space, SaveReservableSpaceRequest $request): void
     {
         $validated = $request->validated();
+        $spaceType = $this->resolveReservationSpaceType($validated);
 
         $space->fill([
             'name' => $validated['name'],
-            'type' => $validated['type'],
+            'reservable_space_type_id' => $spaceType?->id,
+            'type' => $spaceType?->slug ?? ReservableSpaceType::normalizeSlug($validated['type'] ?? 'espaco'),
             'location' => $validated['location'],
             'capacity' => (int) $validated['capacity'],
             'base_price' => (float) $validated['base_price'],
@@ -398,10 +648,63 @@ class TeamController extends Controller
                 'starts_at' => $validated['starts_at'],
                 'ends_at' => $validated['ends_at'],
                 'included_guests' => (int) $validated['included_guests'],
+                'guest_price' => (float) $validated['guest_price'],
+                'map_x' => (int) $validated['map_x'],
+                'map_y' => (int) $validated['map_y'],
+                'map_note' => $validated['map_note'] ?? null,
             ]),
         ]);
 
         $space->save();
+    }
+
+    private function resolveReservationSpaceType(array $validated): ?ReservableSpaceType
+    {
+        if (! empty($validated['reservable_space_type_id'])) {
+            return ReservableSpaceType::find((int) $validated['reservable_space_type_id']);
+        }
+
+        $slug = ReservableSpaceType::normalizeSlug($validated['type'] ?? null);
+
+        return ReservableSpaceType::firstOrCreate(
+            ['slug' => $slug],
+            [
+                'name' => Str::of($slug)->replace('-', ' ')->title()->toString(),
+                'pin_color' => ReservableSpaceType::fallbackColorForSlug($slug),
+                'is_active' => true,
+            ],
+        );
+    }
+
+    private function saveReservationSpaceType(ReservableSpaceType $spaceType, Request $request): void
+    {
+        $slug = ReservableSpaceType::normalizeSlug($request->input('slug') ?: $request->input('name'), $request->input('name'));
+
+        $data = $request->merge(['slug' => $slug])->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'slug' => [
+                'required',
+                'string',
+                'max:120',
+                'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
+                Rule::unique('reservable_space_types', 'slug')->ignore($spaceType->id),
+            ],
+            'pin_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'is_active' => ['nullable', 'boolean'],
+        ], [
+            'pin_color.regex' => 'Informe uma cor hexadecimal valida para o pin.',
+            'slug.regex' => 'Use apenas letras, numeros e hifens no identificador.',
+        ]);
+
+        $spaceType->fill([
+            'name' => $data['name'],
+            'slug' => $data['slug'],
+            'pin_color' => ReservableSpaceType::normalizePinColor($data['pin_color']),
+            'is_active' => $request->boolean('is_active'),
+        ]);
+        $spaceType->save();
+
+        $spaceType->spaces()->update(['type' => $spaceType->slug]);
     }
 
     private function resolveReservationSpaceImageUrl(SaveReservableSpaceRequest $request, ReservableSpace $space): ?string
@@ -419,14 +722,125 @@ class TeamController extends Controller
         return $space->getRawOriginal('image_url');
     }
 
-    private function redirectToReservations(?ReservableSpace $space, string $message): RedirectResponse
+    private function saveProposal(Proposal $proposal, Request $request): void
     {
-        $params = $space?->exists ? ['space' => $space->id] : [];
+        $data = $request->validate([
+            'plan_id' => ['nullable', 'exists:plans,id'],
+            'name' => ['required', 'string', 'max:255'],
+            'cpf' => [
+                'nullable',
+                'string',
+                'max:30',
+                fn (string $attribute, mixed $value, \Closure $fail) => BrazilianMasks::hasCpfLength($value) ?: $fail('Informe um CPF com 11 numeros.'),
+            ],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => [
+                'nullable',
+                'string',
+                'max:40',
+                fn (string $attribute, mixed $value, \Closure $fail) => BrazilianMasks::hasPhoneLength($value) ?: $fail('Informe um telefone com DDD.'),
+            ],
+            'status' => ['required', 'in:new,analysis,approved,rejected'],
+            'signature_status' => ['nullable', 'in:pending,pending_president_signature,signed'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $data['cpf'] = BrazilianMasks::formatCpf($data['cpf'] ?? null);
+        $data['phone'] = BrazilianMasks::formatPhone($data['phone'] ?? null);
+        $data['signature_status'] ??= 'pending';
+
+        if ($data['status'] === 'approved' && ! $proposal->approved_at) {
+            $data['approved_at'] = now();
+        }
+
+        if ($data['status'] === 'rejected' && ! $proposal->rejected_at) {
+            $data['rejected_at'] = now();
+        }
+
+        if ($data['signature_status'] === 'signed' && ! $proposal->signed_at) {
+            $data['signed_at'] = now();
+        }
+
+        $proposal->fill($data);
+        $proposal->save();
+    }
+
+    private function announcementData(Request $request, ?Announcement $announcement = null): array
+    {
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'slug' => ['nullable', 'string', 'max:255'],
+            'category' => ['required', 'string', 'max:120'],
+            'summary' => ['required', 'string', 'max:800'],
+            'body' => ['nullable', 'string', 'max:5000'],
+            'image_url' => ['nullable', 'url', 'max:2048'],
+            'published_at' => ['nullable', 'date'],
+        ]);
+
+        $data['slug'] = $this->uniqueAnnouncementSlug(($data['slug'] ?? null) ?: $data['title'], $announcement);
+        $data['is_featured'] = $request->boolean('is_featured');
+
+        return $data;
+    }
+
+    private function uniqueAnnouncementSlug(string $value, ?Announcement $announcement = null): string
+    {
+        $base = Str::slug($value) ?: 'comunicado';
+        $slug = $base;
+        $counter = 2;
+
+        while (Announcement::where('slug', $slug)
+            ->when($announcement?->exists, fn ($query) => $query->whereKeyNot($announcement->id))
+            ->exists()) {
+            $slug = $base.'-'.$counter;
+            $counter++;
+        }
+
+        return $slug;
+    }
+
+    private function benefitData(Request $request): array
+    {
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'category' => ['required', 'string', 'max:120'],
+            'description' => ['required', 'string', 'max:1200'],
+            'icon' => ['nullable', 'string', 'max:80'],
+        ]);
+
+        $data['is_active'] = $request->boolean('is_active');
+
+        return $data;
+    }
+
+    private function redirectToReservations(ReservableSpace|array|null $space, string $message): RedirectResponse
+    {
+        $params = is_array($space)
+            ? $space
+            : ($space?->exists ? ['space' => $space->id] : []);
 
         return redirect()
             ->to(route('team.dashboard', $params).'#reservas')
             ->with('team_status', $message)
             ->with('team_status_type', 'success');
+    }
+
+    private function redirectToSecretariat(?Proposal $proposal, string $message, string $type = 'success'): RedirectResponse
+    {
+        $params = $proposal?->exists ? ['proposal' => $proposal->id] : [];
+
+        return redirect()
+            ->to(route('team.dashboard', $params).'#secretaria')
+            ->with('team_status', $message)
+            ->with('team_status_type', $type);
+    }
+
+    private function redirectToContent(array $params, string $message, string $type = 'success'): RedirectResponse
+    {
+        return redirect()
+            ->to(route('team.dashboard', $params).'#conteudo')
+            ->with('team_status', $message)
+            ->with('team_status_type', $type);
     }
 
     private function authorizeInternal(): void

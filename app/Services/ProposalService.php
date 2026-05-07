@@ -22,6 +22,12 @@ class ProposalService
             ]);
         }
 
+        if (Member::where('cpf', $proposal->cpf)->exists()) {
+            throw ValidationException::withMessages([
+                'cpf' => 'Este CPF ja pertence a um associado.',
+            ]);
+        }
+
         return DB::transaction(function () use ($proposal, $user) {
             $member = Member::create([
                 'plan_id' => $proposal->plan_id,

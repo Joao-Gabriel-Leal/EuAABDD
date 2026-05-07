@@ -17,6 +17,7 @@ use App\Models\Plan;
 use App\Models\Product;
 use App\Models\Proposal;
 use App\Models\ReservableSpace;
+use App\Models\ReservableSpaceType;
 use App\Models\Reservation;
 use App\Models\StockMovement;
 use App\Models\User;
@@ -60,33 +61,38 @@ class DatabaseSeeder extends Seeder
             ]),
         ]);
 
+        $spaceTypes = ReservableSpaceType::pluck('id', 'slug');
+
         $spaces = collect([
             ReservableSpace::create([
                 'name' => 'Churrasqueira Lago Sul',
                 'type' => 'churrasqueira',
+                'reservable_space_type_id' => $spaceTypes['churrasqueira'] ?? null,
                 'location' => 'Proxima aos complexos aquaticos',
                 'capacity' => 32,
                 'base_price' => 380,
                 'image_url' => 'https://aabbdf.com.br/wp-content/uploads/2022/12/Churrasqueira05-scaled.jpg',
-                'rules' => ['lista_obrigatoria' => true, 'pagamento' => 'associado_responsavel', 'included_guests' => 4, 'starts_at' => '12:00', 'ends_at' => '18:00'],
+                'rules' => ['lista_obrigatoria' => true, 'pagamento' => 'associado_responsavel', 'included_guests' => 4, 'guest_price' => 14, 'starts_at' => '12:00', 'ends_at' => '18:00', 'map_x' => 28, 'map_y' => 58, 'map_note' => 'Proxima ao complexo aquatico'],
             ]),
             ReservableSpace::create([
                 'name' => 'Espaco Bosque',
                 'type' => 'evento',
+                'reservable_space_type_id' => $spaceTypes['evento'] ?? null,
                 'location' => 'Area verde',
                 'capacity' => 80,
                 'base_price' => 720,
                 'image_url' => 'https://aabbdf.com.br/wp-content/uploads/2022/09/camposequadras.jpg',
-                'rules' => ['lista_obrigatoria' => true, 'pagamento' => 'parcial_convidados', 'included_guests' => 8, 'starts_at' => '10:00', 'ends_at' => '22:00'],
+                'rules' => ['lista_obrigatoria' => true, 'pagamento' => 'parcial_convidados', 'included_guests' => 8, 'guest_price' => 14, 'starts_at' => '10:00', 'ends_at' => '22:00', 'map_x' => 72, 'map_y' => 42, 'map_note' => 'Entrada do bosque'],
             ]),
             ReservableSpace::create([
                 'name' => 'Complexo Aquatico',
                 'type' => 'lazer',
+                'reservable_space_type_id' => $spaceTypes['lazer'] ?? null,
                 'location' => 'Piscinas',
                 'capacity' => 120,
                 'base_price' => 0,
                 'image_url' => 'https://aabbdf.com.br/wp-content/uploads/2022/09/complexosaquaticos.jpg',
-                'rules' => ['reserva' => false, 'acesso' => 'beneficio_associado', 'included_guests' => 0],
+                'rules' => ['reserva' => false, 'acesso' => 'beneficio_associado', 'included_guests' => 0, 'guest_price' => 14, 'map_x' => 48, 'map_y' => 30, 'map_note' => 'Piscinas principais'],
             ]),
         ]);
 
@@ -192,10 +198,10 @@ class DatabaseSeeder extends Seeder
                 'due_date' => $demoBillingMonth->setDay($member->dueDay())->toDateString(),
                 'status' => $index === 0 ? 'open' : 'paid',
                 'paid_at' => $index === 0 ? null : now()->subDays($index),
-                'payment_method' => $index === 0 ? 'QR App AABB' : 'Boleto BRB',
+                'payment_method' => $index === 0 ? 'QR App AABB' : 'Boleto Banco do Brasil',
                 'issued_at' => now()->subDays(3),
                 'reviewed_at' => $index === 0 ? null : now()->subDays($index),
-                'metadata' => ['gateway' => 'brb_ready', 'brb_debito' => $index === 1],
+                'metadata' => ['gateway' => 'bb_ready', 'bb_debito' => $index === 1],
             ]);
 
             if ($invoice->status === 'paid') {
@@ -204,7 +210,7 @@ class DatabaseSeeder extends Seeder
                     'amount' => $invoice->amount,
                     'method' => $invoice->payment_method,
                     'status' => 'paid',
-                    'transaction_code' => 'BRB-'.Str::upper(Str::random(8)),
+                    'transaction_code' => 'BB-'.Str::upper(Str::random(8)),
                     'paid_at' => now()->subDays($index),
                     'received_at' => now()->subDays($index),
                 ]);
@@ -216,12 +222,12 @@ class DatabaseSeeder extends Seeder
             'number' => 'AABB-RES-0001',
             'type' => 'reservation',
             'description' => 'Reserva Churrasqueira Lago Sul com lista de convidados',
-            'amount' => 520,
+            'amount' => 450,
             'due_date' => now()->addDays(3),
             'status' => 'open',
             'payment_method' => 'QR App AABB',
             'issued_at' => now(),
-            'metadata' => ['link_pagamento' => '/portal/pagamentos', 'meios_previstos' => ['boleto_brb', 'qr_app', 'cartao_presencial']],
+            'metadata' => ['link_pagamento' => '/portal/pagamentos', 'pagamento' => 'associado_paga', 'valor_aluguel' => 380, 'valor_convidado' => 14, 'quantidade_convidados' => 5, 'valor_convidados' => 70, 'valor_total_reserva' => 450, 'meios_previstos' => ['boleto_banco_do_brasil', 'qr_app', 'cartao_presencial']],
         ]);
 
         $reservation = Reservation::create([
@@ -232,7 +238,7 @@ class DatabaseSeeder extends Seeder
             'starts_at' => '12:00',
             'ends_at' => '18:00',
             'status' => 'pending_payment',
-            'total_amount' => 520,
+            'total_amount' => 450,
             'guest_quota' => 4,
             'notes' => 'Lista aberta para convidados e cobranca vinculada ao associado.',
         ]);
@@ -244,22 +250,22 @@ class DatabaseSeeder extends Seeder
                 'member_id' => $members->first()->id,
                 'name' => $guestName,
                 'cpf' => '000.000.000-0'.$i,
-                'is_extra' => $i >= 4,
-                'amount' => $i >= 4 ? 28 : 0,
-                'status' => $i >= 4 ? 'awaiting_payment' : 'confirmed',
+                'is_extra' => true,
+                'amount' => 14,
+                'status' => 'awaiting_payment',
                 'invitation_code' => $code,
             ]);
 
             Invitation::create([
                 'member_id' => $members->first()->id,
                 'guest_id' => $guest->id,
-                'invoice_id' => $i >= 4 ? $reservationInvoice->id : null,
+                'invoice_id' => $reservationInvoice->id,
                 'type' => 'reservation_guest',
                 'code' => $code,
                 'valid_for' => $reservation->reservation_date,
-                'status' => $i >= 4 ? 'extra_pending' : 'available',
-                'is_extra' => $i >= 4,
-                'amount' => $i >= 4 ? 28 : 0,
+                'status' => 'payment_pending',
+                'is_extra' => true,
+                'amount' => 14,
             ]);
         }
 

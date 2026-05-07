@@ -1,7 +1,7 @@
 @extends('layouts.club', ['title' => 'AABB Brasilia | Clube Digital'])
 
 @section('content')
-    <section class="club-hero" style="--hero-image: url('https://aabbdf.com.br/wp-content/uploads/2022/09/complexosaquaticos.jpg')">
+    <section class="club-hero" style="--hero-image: url('{{ asset('images/aabb.jpg') }}')">
         <div class="club-hero__content">
             <p class="overline">Associacao Atletica Banco do Brasil</p>
             <h1>AABB Brasilia</h1>
@@ -52,7 +52,7 @@
                 <article class="venue-card">
                     <img src="{{ $space->image_url }}" alt="{{ $space->name }}">
                     <div>
-                        <span>{{ ucfirst($space->type) }}</span>
+                        <span>{{ $space->typeName() }}</span>
                         <h3>{{ $space->name }}</h3>
                         <p>{{ $space->location }} | capacidade para {{ $space->capacity }} pessoas.</p>
                     </div>
@@ -89,6 +89,7 @@
                         @endif
                     </dl>
                     <span>{{ $plan->included_guests }} convites/mes | {{ $plan->included_dependents }} dependentes inclusos</span>
+                    <a href="#adesao" class="club-button club-button--blue plan-card__cta" data-plan-select="{{ $plan->id }}">Quero este plano</a>
                 </article>
             @endforeach
         </div>
@@ -143,7 +144,7 @@
             <label>E-mail <input type="email" name="email" required placeholder="voce@email.com"></label>
             <label>Telefone <input name="phone" data-mask="phone" inputmode="numeric" maxlength="15" required placeholder="(61) 99999-9999"></label>
             <label>Plano
-                <select name="plan_id" required>
+                <select name="plan_id" data-plan-target required>
                     @foreach($plans as $plan)
                         <option value="{{ $plan->id }}">{{ $plan->name }}</option>
                     @endforeach

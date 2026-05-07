@@ -18,7 +18,8 @@ class ReservableSpacesTable
             ->columns([
                 TextColumn::make('name')
                     ->searchable(),
-                TextColumn::make('type')
+                TextColumn::make('spaceType.name')
+                    ->label('Tipo')
                     ->searchable(),
                 TextColumn::make('location')
                     ->searchable(),
@@ -28,6 +29,9 @@ class ReservableSpacesTable
                 TextColumn::make('base_price')
                     ->money()
                     ->sortable(),
+                TextColumn::make('rules.guest_price')
+                    ->label('Convidado')
+                    ->money('BRL'),
                 ImageColumn::make('image_url'),
                 IconColumn::make('is_active')
                     ->boolean(),

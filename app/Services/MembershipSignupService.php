@@ -61,13 +61,13 @@ class MembershipSignupService
                 'amount' => $amount,
                 'due_date' => today()->toDateString(),
                 'status' => 'open',
-                'payment_method' => 'QR App AABB / Boleto BRB',
+                'payment_method' => 'QR App AABB / Boleto Banco do Brasil',
                 'issued_at' => now(),
                 'metadata' => [
                     'origem' => 'adesao_publica',
                     'plano' => $plan->name,
                     'categoria' => $category,
-                    'meios_previstos' => ['qr_app', 'boleto_brb', 'debito_brb'],
+                    'meios_previstos' => ['qr_app', 'boleto_banco_do_brasil', 'debito_banco_do_brasil'],
                     'liberacao' => 'apos_pagamento',
                 ],
             ]);

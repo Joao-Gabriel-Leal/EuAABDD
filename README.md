@@ -76,7 +76,7 @@ Para encerrar a publicacao e limpar os processos iniciados pelo launcher:
 
 ## Limitacoes assumidas
 
-- BRB, boleto, QR de pagamento, gateway e catraca ainda sao simulacoes navegaveis sem credenciais reais.
+- Banco do Brasil, boleto, QR de pagamento, gateway e catraca ainda sao simulacoes navegaveis sem credenciais reais.
 - O QR da carteirinha e o QR do estoque nao expoem dados publicamente; eles abrem validacoes internas protegidas por login.
 - Filament continua instalado como painel tecnico em rota nao divulgada, mas nao faz parte do fluxo do funcionario.
 - Imagens do demo apontam para arquivos publicos do site oficial da AABB Brasilia e devem ser substituidas por assets aprovados antes da producao.

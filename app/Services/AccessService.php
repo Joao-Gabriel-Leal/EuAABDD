@@ -11,7 +11,7 @@ class AccessService
 {
     public function registerInvitationAccess(string $code, string $gate = 'Portaria principal'): AccessLog
     {
-        $invitation = Invitation::with(['member.invoices', 'guest'])
+        $invitation = Invitation::with(['member.invoices', 'invoice', 'guest.reservation.invoice'])
             ->where('code', $code)
             ->first();
 
@@ -54,7 +54,25 @@ class AccessService
     private function blockedReason(Invitation $invitation): ?string
     {
         if ($invitation->status !== 'available') {
-            return 'convite '.$invitation->status;
+            return $invitation->status === 'payment_pending'
+                ? 'convite aguardando pagamento'
+                : 'convite '.$invitation->status;
+        }
+
+        if ($invitation->type === 'reservation_guest') {
+            $reservation = $invitation->guest?->reservation;
+
+            if (! $reservation) {
+                return 'reserva nao encontrada';
+            }
+
+            if ($reservation->status !== 'confirmed') {
+                return 'reserva '.$reservation->statusLabel();
+            }
+
+            if ($invitation->invoice && $invitation->invoice->status !== 'paid' && (float) $invitation->invoice->amount > 0) {
+                return 'convite aguardando pagamento';
+            }
         }
 
         if ($invitation->valid_for->isPast() && ! $invitation->valid_for->isToday()) {

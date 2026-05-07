@@ -19,10 +19,10 @@ class PublicController extends Controller
     public function home()
     {
         return view('public.home', [
-            'announcements' => Announcement::latest('published_at')->take(3)->get(),
+            'announcements' => Announcement::whereNotNull('published_at')->latest('published_at')->take(3)->get(),
             'benefits' => Benefit::where('is_active', true)->get(),
             'plans' => Plan::where('is_active', true)->get(),
-            'spaces' => ReservableSpace::where('is_active', true)->get(),
+            'spaces' => ReservableSpace::where('is_active', true)->with('spaceType')->get(),
         ]);
     }
 
