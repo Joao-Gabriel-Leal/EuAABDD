@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Contracts\AabbPaymentGateway;
+use App\Services\ManualAabbPaymentGateway;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -12,7 +14,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(AabbPaymentGateway::class, ManualAabbPaymentGateway::class);
     }
 
     /**
@@ -20,6 +22,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (! $this->app->runningInConsole()) {
+            return;
+        }
+
         $appUrl = rtrim((string) config('app.url'), '/');
 
         if ($appUrl !== '') {

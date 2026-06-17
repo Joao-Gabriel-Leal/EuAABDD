@@ -10,31 +10,35 @@ use App\Models\ReservableSpace;
 use App\Models\Reservation;
 use App\Services\BillingService;
 use App\Services\InvitationService;
-use App\Services\MemberCardService;
 use App\Services\ReservationService;
 use App\Support\BrazilianMasks;
 use App\Support\ReservationMap;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class PortalController extends Controller
 {
-    public function dashboard(BillingService $billingService, MemberCardService $cards)
+    public function dashboard(BillingService $billingService)
     {
         $billingService->markOverdueInvoices();
 
         $member = Auth::user()->member()->with([
             'plan',
-            'dependents',
-            'invoices' => fn ($query) => $query->latest('due_date'),
+            'invoices' => fn ($query) => $query
+                ->whereIn('type', ['membership_initial', 'reservation', 'reservation_guest'])
+                ->latest('due_date'),
             'reservations.space',
             'reservations.invoice',
             'reservations.guests.invitation.invoice',
-            'invitations' => fn ($query) => $query->with('guest.reservation.space')->latest('valid_for')->latest(),
+            'invitations' => fn ($query) => $query
+                ->where('type', 'reservation_guest')
+                ->with('guest.reservation.space')
+                ->latest('valid_for')
+                ->latest(),
         ])->firstOrFail();
 
         return view('portal.dashboard', [
@@ -45,8 +49,6 @@ class PortalController extends Controller
                 ->filter(fn (ReservableSpace $space): bool => ($space->rules['reserva'] ?? true) !== false)
                 ->values(),
             'reservationMapUrl' => ReservationMap::url(),
-            'cardCode' => $cards->code($member),
-            'cardQrCode' => $cards->qrCodeDataUri($member),
         ]);
     }
 
@@ -282,6 +284,7 @@ class PortalController extends Controller
     public function uploadPaymentProof(Request $request, Invoice $invoice, BillingService $billingService)
     {
         abort_unless($invoice->member_id === Auth::user()->member_id, 403);
+        $this->authorizeReservationModuleInvoice($invoice);
 
         $data = $request->validate([
             'payment_method' => ['required', 'string', 'max:80'],
@@ -297,6 +300,7 @@ class PortalController extends Controller
     public function payDemo(Invoice $invoice, BillingService $billingService)
     {
         abort_unless($invoice->member_id === Auth::user()->member_id, 403);
+        $this->authorizeReservationModuleInvoice($invoice);
         abort_unless($invoice->isPayable(), 403);
 
         $billingService->recordManualPayment($invoice, [
@@ -340,6 +344,11 @@ class PortalController extends Controller
         abort_unless($member?->status === 'active', 403);
     }
 
+    private function authorizeReservationModuleInvoice(Invoice $invoice): void
+    {
+        abort_unless(in_array($invoice->type, ['membership_initial', 'reservation', 'reservation_guest'], true), 404);
+    }
+
     private function mergeLegacyGuestContact(Request $request): void
     {
         if ($request->filled('contact')) {
@@ -348,6 +357,7 @@ class PortalController extends Controller
 
         if ($request->filled('email')) {
             $request->merge(['contact' => $request->input('email')]);
+
             return;
         }
 

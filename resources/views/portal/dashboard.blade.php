@@ -25,8 +25,9 @@
         <div>
             <p class="overline">Portal do associado</p>
             <h1>Ola, {{ $member->name }}.</h1>
-            <p>Carteirinha, mensalidades, comprovantes, reservas, convites e dependentes em um so lugar.</p>
+            <p>Reservas, convidados e pagamentos AABB em um so lugar.</p>
         </div>
+        @if(\App\Support\Modules::enabled('member_card'))
         <button
             class="member-card-flip"
             type="button"
@@ -53,6 +54,7 @@
                 </span>
             </span>
         </button>
+        @endif
     </section>
 
     @if($isPendingSignup)
@@ -74,36 +76,37 @@
         </section>
     @endif
 
-    <section class="portal-workspace" data-tab-workspace data-default-tab="financeiro">
+    <section class="portal-workspace" data-tab-workspace data-default-tab="reservas">
         <div class="portal-tab-nav" role="tablist" aria-label="Areas do portal do associado">
             <button
                 type="button"
                 role="tab"
-                class="portal-tab-card is-active"
+                class="portal-tab-card"
                 id="portal-tab-financeiro"
                 aria-controls="portal-panel-financeiro"
-                aria-selected="true"
-                tabindex="0"
+                aria-selected="false"
+                tabindex="-1"
                 data-tab-target="financeiro"
             >
-                <span>Financeiro</span>
-                <strong>Cobrancas</strong>
+                <span>Pagamentos</span>
+                <strong>Cobrancas AABB</strong>
                 <small>{{ $openInvoices->count() }} aberta(s)</small>
             </button>
             <button
                 type="button"
                 role="tab"
-                class="portal-tab-card"
+                class="portal-tab-card is-active"
                 id="portal-tab-reservas"
                 aria-controls="portal-panel-reservas"
-                aria-selected="false"
-                tabindex="-1"
+                aria-selected="true"
+                tabindex="0"
                 data-tab-target="reservas"
             >
                 <span>Clube</span>
                 <strong>Reservas</strong>
                 <small>{{ $futureReservations->count() }} futura(s)</small>
             </button>
+            @if(\App\Support\Modules::enabled('portal_club_invitations'))
             <button
                 type="button"
                 role="tab"
@@ -118,6 +121,8 @@
                 <strong>Convites</strong>
                 <small>{{ $monthInvitations->count() }}/{{ $member->plan->included_guests }} no mes</small>
             </button>
+            @endif
+            @if(\App\Support\Modules::enabled('portal_dependents'))
             <button
                 type="button"
                 role="tab"
@@ -132,6 +137,7 @@
                 <strong>Familia</strong>
                 <small>{{ $member->dependents->where('status', 'active')->count() }}/{{ $member->plan->included_dependents }} cortesia</small>
             </button>
+            @endif
         </div>
 
         <section
@@ -140,6 +146,7 @@
             role="tabpanel"
             aria-labelledby="portal-tab-financeiro"
             data-tab-panel="financeiro"
+            hidden
         >
             <article class="portal-panel portal-panel--tab">
                 <div class="panel-head">
@@ -194,7 +201,6 @@
             role="tabpanel"
             aria-labelledby="portal-tab-reservas"
             data-tab-panel="reservas"
-            hidden
         >
             <div class="portal-tab-stack">
                 <article class="portal-panel portal-panel--tab reservation-booking-panel {{ $isPendingSignup ? 'portal-panel--locked' : '' }}">
@@ -624,6 +630,7 @@
             </div>
         </section>
 
+        @if(\App\Support\Modules::enabled('portal_club_invitations'))
         <section
             class="portal-tab-panel"
             id="portal-panel-convites"
@@ -701,7 +708,9 @@
                 @endif
             </article>
         </section>
+        @endif
 
+        @if(\App\Support\Modules::enabled('portal_dependents'))
         <section
             class="portal-tab-panel"
             id="portal-panel-familia"
@@ -760,5 +769,6 @@
                 @endif
             </article>
         </section>
+        @endif
     </section>
 @endsection

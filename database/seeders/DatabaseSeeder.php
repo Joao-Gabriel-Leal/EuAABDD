@@ -24,12 +24,25 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        $mapAsset = database_path('seeders/assets/reservation-map.jpeg');
+
+        if (is_file($mapAsset) && ($mapContents = file_get_contents($mapAsset)) !== false) {
+            Storage::disk('public')->delete([
+                'club-map/reservation-map.webp',
+                'club-map/reservation-map.png',
+                'club-map/reservation-map.jpg',
+                'club-map/reservation-map.jpeg',
+            ]);
+            Storage::disk('public')->put('club-map/reservation-map.jpeg', $mapContents);
+        }
+
         $plans = collect([
             Plan::create([
                 'name' => 'Efetivo',
@@ -64,37 +77,70 @@ class DatabaseSeeder extends Seeder
         $spaceTypes = ReservableSpaceType::pluck('id', 'slug');
 
         $spaces = collect([
-            ReservableSpace::create([
+            [
                 'name' => 'Churrasqueira Lago Sul',
                 'type' => 'churrasqueira',
                 'reservable_space_type_id' => $spaceTypes['churrasqueira'] ?? null,
-                'location' => 'Proxima aos complexos aquaticos',
+                'location' => 'Conjunto de churrasqueiras',
                 'capacity' => 32,
                 'base_price' => 380,
                 'image_url' => 'https://aabbdf.com.br/wp-content/uploads/2022/12/Churrasqueira05-scaled.jpg',
-                'rules' => ['lista_obrigatoria' => true, 'pagamento' => 'associado_responsavel', 'included_guests' => 4, 'guest_price' => 14, 'starts_at' => '12:00', 'ends_at' => '18:00', 'map_x' => 28, 'map_y' => 58, 'map_note' => 'Proxima ao complexo aquatico'],
-            ]),
-            ReservableSpace::create([
+                'rules' => ['lista_obrigatoria' => true, 'pagamento' => 'associado_responsavel', 'included_guests' => 4, 'guest_price' => 14, 'starts_at' => '12:00', 'ends_at' => '18:00', 'map_x' => 31, 'map_y' => 53, 'map_note' => 'Conjunto de churrasqueiras'],
+            ],
+            [
                 'name' => 'Espaco Bosque',
                 'type' => 'evento',
                 'reservable_space_type_id' => $spaceTypes['evento'] ?? null,
-                'location' => 'Area verde',
+                'location' => 'Area verde e playground',
                 'capacity' => 80,
                 'base_price' => 720,
                 'image_url' => 'https://aabbdf.com.br/wp-content/uploads/2022/09/camposequadras.jpg',
-                'rules' => ['lista_obrigatoria' => true, 'pagamento' => 'parcial_convidados', 'included_guests' => 8, 'guest_price' => 14, 'starts_at' => '10:00', 'ends_at' => '22:00', 'map_x' => 72, 'map_y' => 42, 'map_note' => 'Entrada do bosque'],
-            ]),
-            ReservableSpace::create([
+                'rules' => ['lista_obrigatoria' => true, 'pagamento' => 'parcial_convidados', 'included_guests' => 8, 'guest_price' => 14, 'starts_at' => '10:00', 'ends_at' => '22:00', 'map_x' => 75, 'map_y' => 50, 'map_note' => 'Area verde e playground'],
+            ],
+            [
                 'name' => 'Complexo Aquatico',
                 'type' => 'lazer',
                 'reservable_space_type_id' => $spaceTypes['lazer'] ?? null,
-                'location' => 'Piscinas',
+                'location' => 'Piscinas centrais',
                 'capacity' => 120,
                 'base_price' => 0,
                 'image_url' => 'https://aabbdf.com.br/wp-content/uploads/2022/09/complexosaquaticos.jpg',
-                'rules' => ['reserva' => false, 'acesso' => 'beneficio_associado', 'included_guests' => 0, 'guest_price' => 14, 'map_x' => 48, 'map_y' => 30, 'map_note' => 'Piscinas principais'],
-            ]),
-        ]);
+                'rules' => ['reserva' => false, 'acesso' => 'beneficio_associado', 'included_guests' => 0, 'guest_price' => 14, 'map_x' => 55, 'map_y' => 38, 'map_note' => 'Piscinas centrais'],
+            ],
+            [
+                'name' => 'Quadras de Tenis',
+                'type' => 'quadra',
+                'reservable_space_type_id' => $spaceTypes['quadra'] ?? null,
+                'location' => 'Conjunto de quadras azuis',
+                'capacity' => 4,
+                'base_price' => 80,
+                'image_url' => 'https://aabbdf.com.br/wp-content/uploads/2022/09/camposequadras.jpg',
+                'rules' => ['lista_obrigatoria' => false, 'pagamento' => 'associado_responsavel', 'included_guests' => 0, 'guest_price' => 14, 'starts_at' => '07:00', 'ends_at' => '22:00', 'map_x' => 28, 'map_y' => 78, 'map_note' => 'Conjunto de quadras azuis'],
+            ],
+            [
+                'name' => 'Quadra Poliesportiva',
+                'type' => 'quadra',
+                'reservable_space_type_id' => $spaceTypes['quadra'] ?? null,
+                'location' => 'Quadra laranja e verde',
+                'capacity' => 20,
+                'base_price' => 120,
+                'image_url' => 'https://aabbdf.com.br/wp-content/uploads/2022/09/camposequadras.jpg',
+                'rules' => ['lista_obrigatoria' => false, 'pagamento' => 'associado_responsavel', 'included_guests' => 4, 'guest_price' => 14, 'starts_at' => '08:00', 'ends_at' => '22:00', 'map_x' => 57, 'map_y' => 78, 'map_note' => 'Quadra laranja e verde'],
+            ],
+            [
+                'name' => 'Quadra de Areia',
+                'type' => 'quadra',
+                'reservable_space_type_id' => $spaceTypes['quadra'] ?? null,
+                'location' => 'Quadra de areia',
+                'capacity' => 12,
+                'base_price' => 100,
+                'image_url' => 'https://aabbdf.com.br/wp-content/uploads/2022/09/camposequadras.jpg',
+                'rules' => ['lista_obrigatoria' => false, 'pagamento' => 'associado_responsavel', 'included_guests' => 4, 'guest_price' => 14, 'starts_at' => '08:00', 'ends_at' => '22:00', 'map_x' => 67, 'map_y' => 78, 'map_note' => 'Quadra de areia'],
+            ],
+        ])->map(fn (array $space) => ReservableSpace::updateOrCreate(
+            ['name' => $space['name']],
+            $space,
+        ));
 
         foreach ([
             ['Mensalidade maio/2026', 'monthly', 239],

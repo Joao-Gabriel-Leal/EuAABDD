@@ -1,29 +1,24 @@
-@extends('layouts.club', ['title' => 'Equipe | AABB Brasília'])
+@extends('layouts.club', ['title' => 'Equipe | AABB Brasilia'])
 
 @section('content')
     @php
-        $user = auth()->user();
         $teamTabs = collect([
-            ['id' => 'visao-geral', 'label' => 'Visão geral', 'area' => 'Painel', 'title' => 'Resumo operacional', 'view' => 'team.partials.overview', 'allowed' => true],
-            ['id' => 'secretaria', 'label' => 'Secretaria', 'area' => 'Base social', 'title' => 'Associados, dependentes e propostas', 'view' => 'team.partials.secretariat', 'allowed' => $user->canManageSecretariat()],
-            ['id' => 'financeiro', 'label' => 'Financeiro', 'area' => 'Receita', 'title' => 'Cobranças, pagamentos e caixa', 'view' => 'team.partials.finance', 'allowed' => $user->canManageFinance()],
-            ['id' => 'reservas', 'label' => 'Reservas e Convites', 'area' => 'Clube', 'title' => 'Churrasqueiras, convidados e cotas', 'view' => 'team.partials.reservations', 'allowed' => $user->hasInternalRole()],
-            ['id' => 'portaria', 'label' => 'Portaria', 'area' => 'Acesso', 'title' => 'Carteirinhas, convites e entradas', 'view' => 'team.partials.access', 'allowed' => $user->canManageAccess()],
-            ['id' => 'estoque', 'label' => 'Estoque', 'area' => 'Operação', 'title' => 'Produtos e movimentações', 'view' => 'team.partials.stock', 'allowed' => $user->hasInternalRole()],
-            ['id' => 'conteudo', 'label' => 'Conteúdo', 'area' => 'Comunicação', 'title' => 'Comunicados e benefícios', 'view' => 'team.partials.content', 'allowed' => $user->canManageSecretariat()],
-        ])->filter(fn ($tab) => $tab['allowed'])->values();
+            ['id' => 'reservas', 'label' => 'Reservas', 'area' => 'Clube', 'title' => 'Churrasqueiras, agenda e convidados', 'view' => 'team.partials.reservations'],
+            ['id' => 'importacao', 'label' => 'Importar usuarios', 'area' => 'Base', 'title' => 'Carga inicial de associados', 'view' => 'team.partials.member-import'],
+            ['id' => 'pagamentos', 'label' => 'Pagamentos AABB', 'area' => 'Recebimento', 'title' => 'Comprovantes, baixa e gateway', 'view' => 'team.partials.payments'],
+        ]);
     @endphp
 
     <section class="team-header">
         <div>
             <p class="overline">Painel da equipe</p>
-            <h1>Operação AABB Brasília</h1>
-            <p>Tudo que o funcionário precisa em uma única tela: secretaria, financeiro, reservas, portaria, estoque e comunicação.</p>
+            <h1>Modulo de reservas AABB</h1>
+            <p>Agenda de churrasqueiras, convidados, importacao da base e pagamentos AABB em uma operacao inicial enxuta.</p>
         </div>
     </section>
 
-    <section class="team-workspace" data-team-tabs>
-        <div class="team-tab-nav" role="tablist" aria-label="Módulos da equipe AABB">
+    <section class="team-workspace" data-team-tabs data-default-tab="reservas">
+        <div class="team-tab-nav" role="tablist" aria-label="Modulo de reservas AABB">
             @foreach($teamTabs as $index => $tab)
                 <button
                     type="button"

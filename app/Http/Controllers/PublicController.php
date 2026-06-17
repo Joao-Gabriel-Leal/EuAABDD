@@ -2,10 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Announcement;
-use App\Models\Benefit;
 use App\Models\Member;
-use App\Models\Plan;
 use App\Models\ReservableSpace;
 use App\Models\User;
 use App\Services\MembershipSignupService;
@@ -19,9 +16,6 @@ class PublicController extends Controller
     public function home()
     {
         return view('public.home', [
-            'announcements' => Announcement::whereNotNull('published_at')->latest('published_at')->take(3)->get(),
-            'benefits' => Benefit::where('is_active', true)->get(),
-            'plans' => Plan::where('is_active', true)->get(),
             'spaces' => ReservableSpace::where('is_active', true)->with('spaceType')->get(),
         ]);
     }

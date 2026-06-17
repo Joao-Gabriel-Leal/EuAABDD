@@ -6,25 +6,21 @@ use App\Http\Requests\SaveReservableSpaceRequest;
 use App\Models\AccessLog;
 use App\Models\Announcement;
 use App\Models\Benefit;
-use App\Models\CashEntry;
-use App\Models\Dependent;
 use App\Models\Guest;
+use App\Models\ImportBatch;
 use App\Models\Invitation;
 use App\Models\Invoice;
 use App\Models\Member;
 use App\Models\Payment;
-use App\Models\Plan;
 use App\Models\Product;
 use App\Models\Proposal;
 use App\Models\ReservableSpace;
 use App\Models\ReservableSpaceType;
 use App\Models\Reservation;
-use App\Models\StockMovement;
 use App\Services\AccessService;
 use App\Services\BillingService;
 use App\Services\MemberImportService;
 use App\Services\ProposalService;
-use App\Services\StockQrService;
 use App\Services\StockService;
 use App\Support\BrazilianMasks;
 use App\Support\ReservationMap;
@@ -38,11 +34,11 @@ use Illuminate\Validation\ValidationException;
 
 class TeamController extends Controller
 {
-    public function dashboard(Request $request, BillingService $billingService, StockQrService $stockQrs)
+    public function dashboard(Request $request, BillingService $billingService)
     {
         $this->authorizeInternal();
-        $user = $request->user();
         $billingService->markOverdueInvoices();
+
         $managedReservationSpaces = ReservableSpace::query()
             ->with('spaceType')
             ->orderByDesc('is_active')
@@ -59,39 +55,21 @@ class TeamController extends Controller
         $spaceTypeEditor = $request->integer('space_type')
             ? $managedSpaceTypes->firstWhere('id', $request->integer('space_type'))
             : null;
-        $metricsPeriod = $this->dashboardMetricsPeriod($request);
-        $metricsFrom = $metricsPeriod['from'];
-        $metricsTo = $metricsPeriod['to'];
-        $metricsPeriodLabel = $metricsFrom->format('d/m/Y').' a '.$metricsTo->format('d/m/Y');
-        $proposalEditor = $user->canManageSecretariat() && $request->integer('proposal')
-            ? Proposal::with('plan')->find($request->integer('proposal'))
-            : null;
-        $announcementEditor = $user->canManageSecretariat() && $request->integer('announcement')
-            ? Announcement::find($request->integer('announcement'))
-            : null;
-        $benefitEditor = $user->canManageSecretariat() && $request->integer('benefit')
-            ? Benefit::find($request->integer('benefit'))
-            : null;
 
         return view('team.dashboard', [
-            'plans' => Plan::where('is_active', true)->orderBy('name')->get(),
-            'members' => Member::with(['plan', 'dependents'])->latest()->take(10)->get(),
-            'pendingSignups' => Member::with(['plan', 'invoices'])
-                ->where('status', 'pending_payment')
-                ->latest()
-                ->take(8)
-                ->get(),
-            'dependents' => Dependent::with('member')->latest()->take(10)->get(),
-            'proposals' => Proposal::with('plan')->latest()->take(8)->get(),
-            'proposalEditor' => $proposalEditor,
-            'invoices' => Invoice::with(['member', 'payments'])->latest('due_date')->take(12)->get(),
-            'initialSignupInvoices' => Invoice::with('member')
-                ->where('type', 'membership_initial')
-                ->whereIn('status', ['open', 'pending', 'awaiting_review', 'overdue'])
+            'members' => Member::with('plan')->latest()->take(8)->get(),
+            'importBatches' => ImportBatch::with('createdBy')->latest()->take(6)->get(),
+            'invoices' => Invoice::with(['member', 'payments'])
+                ->whereIn('type', ['membership_initial', 'reservation', 'reservation_guest'])
                 ->latest('due_date')
-                ->take(8)
+                ->take(16)
                 ->get(),
-            'payments' => Payment::with('invoice.member')->latest('received_at')->latest()->take(8)->get(),
+            'payments' => Payment::with('invoice.member')
+                ->whereHas('invoice', fn ($query) => $query->whereIn('type', ['membership_initial', 'reservation', 'reservation_guest']))
+                ->latest('received_at')
+                ->latest()
+                ->take(10)
+                ->get(),
             'reservations' => Reservation::with(['member', 'space', 'guests.invitation', 'invoice'])->latest('reservation_date')->take(12)->get(),
             'reservationSpaces' => $managedReservationSpaces->where('is_active', true)->values(),
             'managedReservationSpaces' => $managedReservationSpaces,
@@ -99,49 +77,19 @@ class TeamController extends Controller
             'spaceTypeEditor' => $spaceTypeEditor,
             'reservationMapUrl' => ReservationMap::url(),
             'spaceEditor' => $spaceEditor,
-            'invitations' => Invitation::with(['member', 'guest', 'invoice'])->latest('valid_for')->take(10)->get(),
+            'invitations' => Invitation::with(['member', 'guest', 'invoice'])
+                ->where('type', 'reservation_guest')
+                ->latest('valid_for')
+                ->take(10)
+                ->get(),
             'guests' => Guest::with(['member', 'reservation.space'])->latest()->take(8)->get(),
-            'products' => Product::with(['movements' => fn ($query) => $query->latest()->take(4)])
-                ->orderBy('quantity')
-                ->get(),
-            'stockMovements' => StockMovement::with(['product', 'createdBy'])->latest()->take(14)->get(),
-            'stockQrCodes' => Product::orderBy('name')->get()->mapWithKeys(fn (Product $product) => [
-                $product->id => $stockQrs->qrCodeDataUri($product),
-            ]),
-            'accessLogs' => AccessLog::latest('checked_at')->take(10)->get(),
-            'announcements' => Announcement::latest('published_at')->take(6)->get(),
-            'announcementEditor' => $announcementEditor,
-            'benefits' => Benefit::latest()->take(6)->get(),
-            'benefitEditor' => $benefitEditor,
-            'cashEntries' => CashEntry::latest('entry_date')->take(8)->get(),
-            'income' => CashEntry::where('type', 'income')->sum('amount'),
-            'expenses' => CashEntry::where('type', 'expense')->sum('amount'),
-            'pendingAmount' => Invoice::whereIn('status', ['open', 'pending', 'awaiting_review'])
-                ->whereBetween('due_date', [$metricsFrom->toDateString(), $metricsTo->toDateString()])
-                ->sum('amount'),
-            'overdueAmount' => Invoice::where('status', 'overdue')
-                ->whereBetween('due_date', [$metricsFrom->toDateString(), $metricsTo->toDateString()])
-                ->sum('amount'),
-            'paidAmount' => Payment::where('status', 'paid')
-                ->whereBetween('received_at', [$metricsFrom->startOfDay(), $metricsTo->endOfDay()])
-                ->sum('amount'),
-            'metricsFrom' => $metricsFrom,
-            'metricsTo' => $metricsTo,
-            'metricsPeriodLabel' => $metricsPeriodLabel,
             'membersCount' => Member::where('status', 'active')->count(),
-            'lowStockCount' => Product::whereColumn('quantity', '<', 'minimum_quantity')->count(),
-            'zeroStockCount' => Product::where('quantity', '<=', 0)->count(),
-            'stockTotalValue' => Product::all()->sum(fn (Product $product) => $product->stockValue()),
-            'stockAlerts' => Product::where('is_active', true)
-                ->where(function ($query) {
-                    $query->where('quantity', '<=', 0)
-                        ->orWhereColumn('quantity', '<', 'minimum_quantity');
-                })
-                ->orderBy('quantity')
-                ->get(),
-            'openInvoicesCount' => Invoice::whereIn('status', ['open', 'pending', 'awaiting_review'])->count(),
-            'overdueInvoicesCount' => Invoice::where('status', 'overdue')->count(),
-            'todayAccessCount' => AccessLog::whereDate('checked_at', today())->count(),
+            'openInvoicesCount' => Invoice::whereIn('type', ['membership_initial', 'reservation', 'reservation_guest'])
+                ->whereIn('status', ['open', 'pending', 'awaiting_review'])
+                ->count(),
+            'overdueInvoicesCount' => Invoice::whereIn('type', ['membership_initial', 'reservation', 'reservation_guest'])
+                ->where('status', 'overdue')
+                ->count(),
             'scheduledReservationsCount' => Reservation::whereDate('reservation_date', '>=', today())->count(),
         ]);
     }
@@ -184,7 +132,7 @@ class TeamController extends Controller
     {
         $this->authorizeInternal();
 
-        $space = new ReservableSpace();
+        $space = new ReservableSpace;
         $this->saveReservationSpace($space, $request);
 
         return $this->redirectToReservations($space, 'Espaco cadastrado e disponivel para agenda, portal e home.');
@@ -219,7 +167,7 @@ class TeamController extends Controller
     {
         $this->authorizeInternal();
 
-        $spaceType = new ReservableSpaceType();
+        $spaceType = new ReservableSpaceType;
         $this->saveReservationSpaceType($spaceType, $request);
 
         return $this->redirectToReservations(
@@ -295,6 +243,7 @@ class TeamController extends Controller
     public function markInvoicePaid(Request $request, Invoice $invoice, BillingService $billingService)
     {
         $this->authorizeFinance();
+        abort_unless(in_array($invoice->type, ['membership_initial', 'reservation', 'reservation_guest'], true), 404);
 
         $data = $request->validate([
             'amount' => ['nullable', 'numeric', 'min:0.01'],
@@ -328,7 +277,7 @@ class TeamController extends Controller
     {
         $this->authorizeSecretariat();
 
-        $proposal = new Proposal();
+        $proposal = new Proposal;
         $this->saveProposal($proposal, $request);
 
         return $this->redirectToSecretariat($proposal, 'Proposta manual cadastrada para analise da secretaria.');

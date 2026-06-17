@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\AccessLog;
 use App\Mail\ClubInvitationMail;
 use App\Mail\ReservationGuestSplitMail;
+use App\Models\AccessLog;
 use App\Models\Announcement;
 use App\Models\Benefit;
 use App\Models\Dependent;
@@ -36,71 +36,29 @@ class AabbOperationsTest extends TestCase
     {
         $this->get('/')
             ->assertStatus(200)
-            ->assertSee('AABB')
-            ->assertSee('Quero me associar');
+            ->assertSee('Reservas AABB Brasilia')
+            ->assertSee('Entrar no sistema')
+            ->assertDontSee('Quero me associar')
+            ->assertDontSee('Planos e mensalidades')
+            ->assertDontSee('Comunicados e eventos');
     }
 
     public function test_public_direct_signup_creates_pending_member_user_and_initial_invoice(): void
     {
-        $plan = Plan::where('name', 'Efetivo')->firstOrFail();
-
-        $this->post(route('proposal.store'), [
+        $this->post('/adesao', [
             'name' => 'Novo Associado Direto',
             'cpf' => '12345678901',
             'email' => 'novo.direto@aabb.demo',
             'phone' => '61999999999',
-            'plan_id' => $plan->id,
+            'plan_id' => 1,
             'category' => 'Familiar',
             'password' => 'senha-aabb-2026',
             'password_confirmation' => 'senha-aabb-2026',
-        ])->assertRedirect(route('portal.dashboard'));
+        ])->assertNotFound();
 
-        $member = Member::where('email', 'novo.direto@aabb.demo')->firstOrFail();
-        $memberUser = User::where('email', 'novo.direto@aabb.demo')->firstOrFail();
-        $invoice = Invoice::where('member_id', $member->id)->where('type', 'membership_initial')->firstOrFail();
-
-        $this->assertSame('pending_payment', $member->status);
-        $this->assertSame('member', $memberUser->role);
-        $this->assertSame($member->id, $memberUser->member_id);
-        $this->assertSame('open', $invoice->status);
-        $this->assertSame(239.0, (float) $invoice->amount);
-
-        $this->assertDatabaseHas('members', [
+        $this->assertDatabaseMissing('members', [
             'email' => 'novo.direto@aabb.demo',
-            'cpf' => '123.456.789-01',
-            'phone' => '(61) 99999-9999',
         ]);
-
-        $this->post(route('proposal.store'), [
-            'name' => 'Duplicado CPF',
-            'cpf' => '12345678901',
-            'email' => 'duplicado@aabb.demo',
-            'phone' => '61999999998',
-            'plan_id' => $plan->id,
-            'category' => 'Familiar',
-            'password' => 'senha-aabb-2026',
-            'password_confirmation' => 'senha-aabb-2026',
-        ])->assertSessionHasErrors(['cpf']);
-
-        $portaria = User::where('email', 'portaria@aabb.demo')->firstOrFail();
-
-        $this->actingAs($portaria)
-            ->get(route('member-card.verify', $member->card_token))
-            ->assertStatus(200)
-            ->assertSee('Acesso bloqueado')
-            ->assertSee('Adesao aguardando pagamento');
-
-        $this->actingAs($memberUser)
-            ->post(route('portal.pay.demo', $invoice))
-            ->assertRedirect();
-
-        $this->assertSame('active', $member->fresh()->status);
-        $this->assertSame('paid', $invoice->fresh()->status);
-
-        $this->actingAs($portaria)
-            ->get(route('member-card.verify', $member->fresh()->card_token))
-            ->assertStatus(200)
-            ->assertSee('Acesso permitido');
     }
 
     public function test_member_reservation_blocks_schedule_conflicts_and_finance_confirms_it(): void
@@ -117,6 +75,8 @@ class AabbOperationsTest extends TestCase
             ->assertRedirect();
 
         $reservation = Reservation::whereDate('reservation_date', $date)->firstOrFail();
+        $this->assertSame('manual', $reservation->invoice->metadata['payment_gateway']['driver']);
+        $this->assertSame('reservation', $reservation->invoice->metadata['payment_gateway']['context']['type']);
 
         $this->actingAs($memberUser)
             ->post(route('portal.reserve'), [
@@ -137,6 +97,7 @@ class AabbOperationsTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame('paid', $reservation->invoice->fresh()->status);
+        $this->assertSame('TESTE-BAIXA', $reservation->invoice->fresh()->metadata['payment_gateway']['manual_confirmation']['reference']);
         $this->assertSame('confirmed', $reservation->fresh()->status);
     }
 
@@ -173,16 +134,6 @@ class AabbOperationsTest extends TestCase
         $this->assertTrue($reservation->guests->every(fn (Guest $guest): bool => $guest->status === 'awaiting_payment'));
         $this->assertTrue($reservation->guests->every(fn (Guest $guest): bool => $guest->invitation->status === 'payment_pending'));
         Mail::assertNothingSent();
-
-        $portaria = User::where('email', 'portaria@aabb.demo')->firstOrFail();
-        $this->actingAs($portaria)
-            ->post(route('team.access.register'), [
-                'code' => $reservation->guests->first()->invitation->code,
-                'gate' => 'Portaria reserva pendente',
-            ])
-            ->assertRedirect();
-
-        $this->assertStringStartsWith('blocked:', AccessLog::latest('id')->firstOrFail()->status);
 
         $finance = User::where('email', 'financeiro@aabb.demo')->firstOrFail();
         $this->actingAs($finance)
@@ -306,18 +257,43 @@ class AabbOperationsTest extends TestCase
             ->get(route('portal.dashboard'))
             ->assertOk()
             ->assertSee('Portal do associado')
-            ->assertSee('member-card-flip', false)
+            ->assertDontSee('member-card-flip', false)
             ->assertSee('data-tab-workspace', false)
-            ->assertSee('data-default-tab="financeiro"', false)
+            ->assertSee('data-default-tab="reservas"', false)
             ->assertSee('data-tab-target="financeiro"', false)
             ->assertSee('data-tab-target="reservas"', false)
-            ->assertSee('data-tab-target="convites"', false)
-            ->assertSee('data-tab-target="familia"', false)
+            ->assertDontSee('data-tab-target="convites"', false)
+            ->assertDontSee('data-tab-target="familia"', false)
             ->assertSee('id="portal-panel-financeiro"', false)
             ->assertSee('id="portal-panel-reservas"', false)
-            ->assertSee('id="portal-panel-convites"', false)
-            ->assertSee('id="portal-panel-familia"', false)
+            ->assertDontSee('id="portal-panel-convites"', false)
+            ->assertDontSee('id="portal-panel-familia"', false)
+            ->assertDontSee('Cadastrar dependente')
+            ->assertDontSee('Gerar convite')
+            ->assertDontSee('Carteirinha')
             ->assertSee('role="tabpanel"', false);
+    }
+
+    public function test_hidden_modules_return_not_found_in_reservas_branch(): void
+    {
+        $memberUser = User::where('email', 'associado@aabb.demo')->firstOrFail();
+        $team = User::where('email', 'equipe@aabb.demo')->firstOrFail();
+        $product = Product::firstOrFail();
+
+        $this->get('/painel-tecnico-aabb')->assertNotFound();
+        $this->post('/adesao')->assertNotFound();
+
+        $this->actingAs($memberUser)->post('/portal/dependentes')->assertNotFound();
+        $this->actingAs($memberUser)->post('/portal/convites')->assertNotFound();
+
+        $this->actingAs($team)->get('/carteirinha/validar/token-invalido')->assertNotFound();
+        $this->actingAs($team)->post('/equipe/propostas')->assertNotFound();
+        $this->actingAs($team)->post('/equipe/comunicados')->assertNotFound();
+        $this->actingAs($team)->post('/equipe/beneficios')->assertNotFound();
+        $this->actingAs($team)->post("/equipe/estoque/{$product->id}/movimento")->assertNotFound();
+        $this->actingAs($team)->post('/equipe/acesso/registrar')->assertNotFound();
+        $this->actingAs($team)->post('/equipe/faturamento/mensalidades')->assertNotFound();
+        $this->actingAs($team)->get('/gestao/propostas')->assertNotFound();
     }
 
     public function test_portal_reservation_map_and_clean_reservation_modal_are_visible(): void
@@ -717,6 +693,8 @@ class AabbOperationsTest extends TestCase
 
     public function test_member_can_register_dependents_from_portal_and_monthly_billing_includes_extra_fee(): void
     {
+        $this->markTestSkipped('Dependentes e faturamento mensal completo ficam ocultos na branch reservas.');
+
         $memberUser = User::where('email', 'associado@aabb.demo')->firstOrFail();
         $member = $memberUser->member()->with('plan')->firstOrFail();
         $member->plan->update([
@@ -823,6 +801,8 @@ class AabbOperationsTest extends TestCase
 
     public function test_monthly_billing_generation_is_idempotent(): void
     {
+        $this->markTestSkipped('Faturamento mensal completo fica oculto na branch reservas.');
+
         $finance = User::where('email', 'financeiro@aabb.demo')->firstOrFail();
 
         $this->actingAs($finance)
@@ -843,6 +823,8 @@ class AabbOperationsTest extends TestCase
 
     public function test_club_invitation_quota_creates_extra_charge_and_access_log(): void
     {
+        $this->markTestSkipped('Convites avulsos e portaria ficam ocultos na branch reservas.');
+
         Mail::fake();
         $memberUser = User::where('email', 'associado@aabb.demo')->firstOrFail();
         $reservationInvitation = Invitation::with('guest.reservation.space')
@@ -912,8 +894,8 @@ class AabbOperationsTest extends TestCase
     public function test_secretariat_imports_members_and_stock_movement_updates_balance(): void
     {
         $secretaria = User::where('email', 'secretaria@aabb.demo')->firstOrFail();
-        $csv = "nome;cpf;email;telefone;plano;categoria;dependente;cpf_dependente\n";
-        $csv .= "Teste Importado;999.888.777-66;importado@aabb.demo;(61) 99999-0000;Efetivo;Familiar;Filho Importado;999.888.777-00\n";
+        $csv = "nome;cpf;email;telefone;plano;categoria;senha;dependente;cpf_dependente\n";
+        $csv .= "Teste Importado;999.888.777-66;importado@aabb.demo;(61) 99999-0000;Efetivo;Familiar;senha-importada;Filho Importado;999.888.777-00\n";
 
         $this->actingAs($secretaria)
             ->post(route('team.members.import'), [
@@ -925,22 +907,23 @@ class AabbOperationsTest extends TestCase
         $this->assertSame('Teste Importado', $member->name);
         $this->assertTrue($member->dependents()->where('name', 'Filho Importado')->exists());
 
-        $product = Product::firstOrFail();
-        $initial = $product->quantity;
+        $user = User::where('email', 'importado@aabb.demo')->firstOrFail();
+        $this->assertSame('member', $user->role);
+        $this->assertSame($member->id, $user->member_id);
 
-        $this->actingAs(User::where('email', 'equipe@aabb.demo')->firstOrFail())
-            ->post(route('team.stock.move', $product), [
-                'type' => 'exit',
-                'quantity' => 2,
-                'reason' => 'Teste automatizado',
-            ])
-            ->assertRedirect();
+        auth()->logout();
 
-        $this->assertSame($initial - 2, $product->fresh()->quantity);
+        $this->post(route('login.attempt'), [
+            'email' => 'importado@aabb.demo',
+            'password' => 'senha-importada',
+        ])
+            ->assertRedirect(route('portal.dashboard'));
     }
 
     public function test_secretariat_can_manage_manual_proposals_from_team_dashboard(): void
     {
+        $this->markTestSkipped('Propostas ficam ocultas na branch reservas.');
+
         $secretaria = User::where('email', 'secretaria@aabb.demo')->firstOrFail();
         $plan = Plan::where('name', 'Comunitario')->firstOrFail();
 
@@ -997,6 +980,8 @@ class AabbOperationsTest extends TestCase
 
     public function test_manual_proposal_form_is_collapsed_until_create_or_edit_is_requested(): void
     {
+        $this->markTestSkipped('Propostas ficam ocultas na branch reservas.');
+
         $secretaria = User::where('email', 'secretaria@aabb.demo')->firstOrFail();
         $proposal = Proposal::firstOrFail();
 
@@ -1020,6 +1005,8 @@ class AabbOperationsTest extends TestCase
 
     public function test_secretariat_can_manage_announcements_and_benefits_from_team_dashboard(): void
     {
+        $this->markTestSkipped('Conteudo fica oculto na branch reservas.');
+
         $secretaria = User::where('email', 'secretaria@aabb.demo')->firstOrFail();
 
         $this->actingAs($secretaria)
@@ -1096,6 +1083,8 @@ class AabbOperationsTest extends TestCase
 
     public function test_content_forms_are_collapsed_until_create_or_edit_is_requested(): void
     {
+        $this->markTestSkipped('Conteudo fica oculto na branch reservas.');
+
         $secretaria = User::where('email', 'secretaria@aabb.demo')->firstOrFail();
         $announcement = Announcement::firstOrFail();
         $benefit = Benefit::firstOrFail();
@@ -1133,6 +1122,8 @@ class AabbOperationsTest extends TestCase
 
     public function test_non_secretariat_users_cannot_use_team_content_and_proposal_forms(): void
     {
+        $this->markTestSkipped('Conteudo e propostas ficam ocultos na branch reservas.');
+
         $finance = User::where('email', 'financeiro@aabb.demo')->firstOrFail();
         $plan = Plan::firstOrFail();
 
@@ -1163,6 +1154,8 @@ class AabbOperationsTest extends TestCase
 
     public function test_professional_stock_tracks_qr_costs_and_audit_log(): void
     {
+        $this->markTestSkipped('Estoque fica oculto na branch reservas.');
+
         $team = User::where('email', 'equipe@aabb.demo')->firstOrFail();
         $product = Product::firstOrFail();
 
@@ -1208,6 +1201,8 @@ class AabbOperationsTest extends TestCase
 
     public function test_access_validation_returns_json_without_page_reload(): void
     {
+        $this->markTestSkipped('Portaria fica oculta na branch reservas.');
+
         $portaria = User::where('email', 'portaria@aabb.demo')->firstOrFail();
         $member = Member::where('status', 'active')->firstOrFail();
         $guest = Guest::create([
@@ -1268,8 +1263,35 @@ class AabbOperationsTest extends TestCase
         $this->assertNotEmpty($response->json('selectedReservations'));
     }
 
+    public function test_reservas_branch_team_panel_exposes_only_reservation_import_and_payment_tabs(): void
+    {
+        $team = User::where('email', 'equipe@aabb.demo')->firstOrFail();
+
+        $this->get('/admin')->assertRedirect('/equipe');
+        $this->get('/gestao')->assertRedirect('/equipe');
+        $this->get('/gestao/cobrancas')->assertRedirect('/equipe#pagamentos');
+        $this->get('/gestao/propostas')->assertNotFound();
+
+        $this->actingAs($team)
+            ->get('/equipe')
+            ->assertStatus(200)
+            ->assertSee('data-team-tabs', false)
+            ->assertSee('data-team-tab-target="reservas"', false)
+            ->assertSee('data-team-tab-target="importacao"', false)
+            ->assertSee('data-team-tab-target="pagamentos"', false)
+            ->assertSee('Reservas')
+            ->assertSee('Importar usuarios')
+            ->assertSee('Pagamentos AABB')
+            ->assertDontSee('Secretaria')
+            ->assertDontSee('Portaria')
+            ->assertDontSee('Estoque')
+            ->assertDontSee('Conteudo');
+    }
+
     public function test_team_metrics_default_to_current_month_and_marks_snapshot_cards(): void
     {
+        $this->markTestSkipped('Metricas gerais ficam ocultas na branch reservas.');
+
         $this->travelTo(CarbonImmutable::parse('2026-05-05 10:00:00'));
 
         $team = User::where('email', 'equipe@aabb.demo')->firstOrFail();
@@ -1290,6 +1312,8 @@ class AabbOperationsTest extends TestCase
 
     public function test_team_metrics_custom_period_filters_received_amount_by_received_at(): void
     {
+        $this->markTestSkipped('Metricas gerais ficam ocultas na branch reservas.');
+
         $team = User::where('email', 'equipe@aabb.demo')->firstOrFail();
         $member = Member::firstOrFail();
 
@@ -1350,6 +1374,8 @@ class AabbOperationsTest extends TestCase
 
     public function test_team_panel_uses_internal_tabs_and_legacy_admin_redirects_to_team(): void
     {
+        $this->markTestSkipped('Painel completo foi substituido pelo painel enxuto de reservas.');
+
         $team = User::where('email', 'equipe@aabb.demo')->firstOrFail();
 
         $this->get('/admin')
@@ -1359,7 +1385,7 @@ class AabbOperationsTest extends TestCase
             ->assertRedirect('/equipe');
 
         $this->get('/gestao/cobrancas')
-            ->assertRedirect('/equipe#financeiro');
+            ->assertRedirect('/equipe#pagamentos');
 
         $this->actingAs($team)
             ->get('/equipe')
@@ -1377,6 +1403,8 @@ class AabbOperationsTest extends TestCase
 
     public function test_team_panel_respects_role_specific_tabs(): void
     {
+        $this->markTestSkipped('Permissoes por aba do painel completo ficam ocultas na branch reservas.');
+
         $finance = User::where('email', 'financeiro@aabb.demo')->firstOrFail();
         $secretaria = User::where('email', 'secretaria@aabb.demo')->firstOrFail();
         $portaria = User::where('email', 'portaria@aabb.demo')->firstOrFail();
@@ -1402,6 +1430,8 @@ class AabbOperationsTest extends TestCase
 
     public function test_member_card_has_qr_flip_and_internal_validation(): void
     {
+        $this->markTestSkipped('Carteirinha e portaria ficam ocultas na branch reservas.');
+
         $memberUser = User::where('email', 'associado@aabb.demo')->firstOrFail();
         $member = $memberUser->member()->firstOrFail();
 

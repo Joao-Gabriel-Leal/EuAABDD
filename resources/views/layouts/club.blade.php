@@ -18,9 +18,7 @@
         </a>
 
         <nav class="club-nav" aria-label="Menu principal">
-            <a href="{{ route('home') }}#estrutura">Estrutura</a>
-            <a href="{{ route('home') }}#planos">Planos</a>
-            <a href="{{ route('home') }}#comunicados">Comunicados</a>
+            <a href="{{ route('home') }}#reservas">Reservas</a>
             @auth
                 @if(auth()->user()->role === 'member')
                     <a href="{{ route('portal.dashboard') }}">Portal</a>

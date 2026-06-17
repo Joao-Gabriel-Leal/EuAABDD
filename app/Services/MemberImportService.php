@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\BrazilianMasks;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use ZipArchive;
@@ -141,7 +142,43 @@ class MemberImportService
             );
         }
 
+        $this->syncPortalUser($member, $payload);
+
         return $member;
+    }
+
+    private function syncPortalUser(Member $member, array $payload): void
+    {
+        if (! $member->email) {
+            return;
+        }
+
+        $password = $this->value($payload, ['senha', 'password']);
+
+        if (! $password && config('modules.imports.create_temporary_passwords')) {
+            $password = (string) config('modules.imports.temporary_password');
+        }
+
+        $user = User::where('email', $member->email)->first();
+
+        if (! $user && ! $password) {
+            return;
+        }
+
+        $attributes = [
+            'name' => $member->name,
+            'role' => 'member',
+            'member_id' => $member->id,
+        ];
+
+        if ($password) {
+            $attributes['password'] = Hash::make($password);
+        }
+
+        User::updateOrCreate(
+            ['email' => $member->email],
+            $attributes,
+        );
     }
 
     private function readCsv(string $path): array
@@ -162,7 +199,7 @@ class MemberImportService
 
     private function readXlsx(string $path): array
     {
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
 
         if ($zip->open($path) !== true) {
             throw ValidationException::withMessages(['file' => 'Não foi possível abrir o XLSX.']);

@@ -69,6 +69,10 @@ class MembershipSignupService
                     'categoria' => $category,
                     'meios_previstos' => ['qr_app', 'boleto_banco_do_brasil', 'debito_banco_do_brasil'],
                     'liberacao' => 'apos_pagamento',
+                    'payment_gateway' => $this->billingService->paymentMetadata([
+                        'type' => 'membership_initial',
+                        'member_id' => $member->id,
+                    ]),
                 ],
             ]);
 

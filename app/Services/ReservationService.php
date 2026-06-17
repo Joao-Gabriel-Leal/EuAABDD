@@ -77,6 +77,12 @@ class ReservationService
                     'valor_convidados' => $guestTotal,
                     'valor_total_reserva' => $reservationTotal,
                     'meios_previstos' => ['boleto_banco_do_brasil', 'qr_app', 'cartao_presencial'],
+                    'payment_gateway' => $this->billingService->paymentMetadata([
+                        'type' => 'reservation',
+                        'member_id' => $member->id,
+                        'space_id' => $space->id,
+                        'payment_mode' => $paymentMode,
+                    ]),
                 ],
             ]);
 
@@ -298,6 +304,12 @@ class ReservationService
                     'contact_channel' => $guest->contact_channel,
                     'space' => $reservation->space->name,
                     'payment_mode' => 'rateio_email',
+                    'payment_gateway' => $this->billingService->paymentMetadata([
+                        'type' => 'reservation_guest',
+                        'member_id' => $reservation->member_id,
+                        'reservation_id' => $reservation->id,
+                        'guest_id' => $guest->id,
+                    ]),
                 ],
             ]);
         }

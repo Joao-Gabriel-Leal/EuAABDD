@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\AabbPaymentGateway;
 use App\Mail\ClubInvitationMail;
 use App\Models\CashEntry;
 use App\Models\Invoice;
@@ -18,6 +19,8 @@ use Illuminate\Validation\ValidationException;
 
 class BillingService
 {
+    public function __construct(private readonly AabbPaymentGateway $paymentGateway) {}
+
     public function createMonthlyInvoices(int $year, int $month): Collection
     {
         $billingMonth = CarbonImmutable::create($year, $month, 1)->startOfMonth();
@@ -63,6 +66,11 @@ class BillingService
                                 'categoria' => $member->category,
                                 'vencimento' => $dueDay,
                                 'valor_dependentes' => $dependentExtraAmount,
+                                'payment_gateway' => $this->paymentMetadata([
+                                    'type' => 'monthly',
+                                    'member_id' => $member->id,
+                                    'billing_month' => $billingMonth->toDateString(),
+                                ]),
                             ],
                         ]);
 
@@ -94,6 +102,10 @@ class BillingService
         $metadata = $invoice->metadata ?? [];
         $metadata['portal_notes'] = $notes;
         $metadata['proof_uploaded_at'] = now()->toDateTimeString();
+        $metadata['payment_gateway'] = $metadata['payment_gateway'] ?? $this->paymentMetadata([
+            'type' => $invoice->type,
+            'invoice_id' => $invoice->id,
+        ]);
 
         $invoice->update([
             'status' => 'awaiting_review',
@@ -136,6 +148,18 @@ class BillingService
                 'received_at' => now(),
             ]);
 
+            $metadata = $invoice->metadata ?? [];
+            $metadata['payment_gateway'] = $metadata['payment_gateway'] ?? $this->paymentMetadata([
+                'type' => $invoice->type,
+                'invoice_id' => $invoice->id,
+            ]);
+            $metadata['payment_gateway']['manual_confirmation'] = [
+                'method' => $method,
+                'reference' => $payment->transaction_code,
+                'confirmed_by_user_id' => $user?->id,
+                'confirmed_at' => now()->toDateTimeString(),
+            ];
+
             $invoice->update([
                 'status' => 'paid',
                 'paid_at' => $paidAt,
@@ -144,6 +168,7 @@ class BillingService
                 'manual_reference' => $payment->transaction_code,
                 'confirmed_by_user_id' => $user?->id,
                 'reviewed_at' => now(),
+                'metadata' => $metadata,
             ]);
 
             $this->activateLinkedRecords($invoice->fresh());
@@ -156,6 +181,11 @@ class BillingService
     public function nextNumber(string $prefix, Member $member): string
     {
         return 'AABB-'.$prefix.'-'.now()->format('YmdHis').'-'.$member->id.'-'.Str::upper(Str::random(3));
+    }
+
+    public function paymentMetadata(array $context = []): array
+    {
+        return $this->paymentGateway->metadata($context);
     }
 
     private function activateLinkedRecords(Invoice $invoice): void
