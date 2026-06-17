@@ -394,6 +394,26 @@ const setupReservationCalendar = (calendar) => {
         title.textContent = 'Carregando...';
         daysRoot.innerHTML = '<span class="calendar-loading">Buscando agenda...</span>';
         slotsRoot.innerHTML = '';
+        reservationsRoot && (reservationsRoot.innerHTML = '');
+        summaryRoot && (summaryRoot.innerHTML = '');
+    };
+
+    const setCalendarError = () => {
+        title.textContent = 'Agenda indisponivel';
+        daysRoot.innerHTML = '<span class="calendar-loading calendar-loading--error">Nao foi possivel carregar a agenda. Recarregue a pagina ou tente outro espaco.</span>';
+        slotsRoot.innerHTML = '<p class="calendar-muted">A disponibilidade nao retornou agora.</p>';
+
+        if (summaryRoot) {
+            summaryRoot.innerHTML = '<strong>Agenda nao carregada</strong><span>O restante da tela continua disponivel para editar espacos e pins.</span>';
+        }
+
+        if (reservationsRoot) {
+            reservationsRoot.innerHTML = '';
+        }
+
+        if (submit) {
+            submit.disabled = true;
+        }
     };
 
     const markSelectedDay = () => {
@@ -412,12 +432,23 @@ const setupReservationCalendar = (calendar) => {
             month: monthKey(currentMonth),
             date: selectedDate,
         });
-        const response = await fetch(`${url}?${params.toString()}`, {
-            headers: { Accept: 'application/json' },
-        });
+        try {
+            const response = await fetch(`${url}?${params.toString()}`, {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            });
 
-        calendarData = await response.json();
-        renderCalendar();
+            if (! response.ok) {
+                throw new Error(`Agenda indisponivel (${response.status})`);
+            }
+
+            calendarData = await response.json();
+            renderCalendar();
+        } catch (error) {
+            console.warn(error);
+            calendarData = null;
+            setCalendarError();
+        }
     };
 
     const selectDate = (date, blocked, past) => {

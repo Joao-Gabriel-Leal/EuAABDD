@@ -222,7 +222,7 @@
                             <input type="hidden" name="reservation_date" value="{{ now()->addWeek()->format('Y-m-d') }}" data-calendar-date-input required>
 
                             <div class="reservation-builder-grid reservation-builder-grid--schedule-first">
-                                <div class="calendar-shell calendar-shell--portal" data-reservation-calendar data-calendar-mode="portal" data-availability-url="{{ route('reservations.availability') }}">
+                                <div class="calendar-shell calendar-shell--portal" data-reservation-calendar data-calendar-mode="portal" data-availability-url="{{ route('reservations.availability', [], false) }}">
                                     <div class="calendar-board calendar-board--compact">
                                         <section class="calendar-card">
                                             <div class="calendar-card__head">

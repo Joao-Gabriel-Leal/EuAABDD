@@ -262,6 +262,7 @@ class LoginAndReservationSpaceManagementTest extends TestCase
             ->assertSee('data-team-space-pin', false)
             ->assertSee('data-team-space-list-item', false)
             ->assertSee('data-team-space-empty', false)
+            ->assertSee('data-availability-url="/reservas/disponibilidade"', false)
             ->assertSee('reservation-map-board', false)
             ->assertSee('pin-type-drawer', false)
             ->assertDontSee('space-editor-form', false)

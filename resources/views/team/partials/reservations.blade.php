@@ -405,7 +405,7 @@
         </div>
 
         @if($reservationSpaces->isNotEmpty())
-            <div class="calendar-shell" data-reservation-calendar data-calendar-mode="team" data-availability-url="{{ route('reservations.availability') }}">
+            <div class="calendar-shell" data-reservation-calendar data-calendar-mode="team" data-availability-url="{{ route('reservations.availability', [], false) }}">
                 <div class="calendar-toolbar">
                     <label>Espaco
                         <select data-calendar-space>

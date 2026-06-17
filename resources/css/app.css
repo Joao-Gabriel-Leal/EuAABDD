@@ -2430,40 +2430,68 @@ textarea {
 
 .reservation-admin-ledger {
     display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(260px, .65fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
+    width: 100%;
+}
+
+.reservation-admin-ledger > * {
+    min-width: 0;
+}
+
+.reservation-admin-ledger .ops-panel-wide {
+    grid-column: 1 / -1;
 }
 
 .reservation-recent-list {
     display: grid;
-    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 10px;
     margin-top: 12px;
 }
 
 .reservation-recent-card {
     display: grid;
-    grid-template-columns: minmax(120px, auto) minmax(0, 1fr) auto;
-    gap: 12px;
-    align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 14px;
+    align-items: start;
     border: 1px solid var(--line);
     background: #fff;
-    padding: 10px;
+    padding: 14px;
+}
+
+.reservation-recent-card .stock-badge {
+    grid-column: 1 / -1;
+    width: max-content;
+    max-width: 100%;
+    white-space: normal;
 }
 
 .reservation-recent-card strong {
     display: block;
     color: var(--blue);
+    overflow-wrap: anywhere;
+    font-size: 1rem;
+    line-height: 1.25;
 }
 
 .reservation-recent-card small {
     display: block;
+    margin-top: 3px;
     color: var(--muted);
     font-weight: 700;
+    line-height: 1.35;
 }
 
 .reservation-recent-card > b {
     color: var(--blue);
     white-space: nowrap;
+    align-self: center;
+    font-size: 1rem;
+}
+
+.reservation-admin-ledger .ops-collapsible {
+    width: 100%;
 }
 
 .calendar-loading {
@@ -2471,6 +2499,12 @@ textarea {
     color: var(--muted);
     font-weight: 800;
     padding: 16px;
+}
+
+.calendar-loading--error {
+    border: 1px solid rgba(180, 35, 24, .18);
+    background: #fff1f0;
+    color: var(--red);
 }
 
 .reservation-map-manager {
