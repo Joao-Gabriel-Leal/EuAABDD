@@ -257,18 +257,23 @@ class LoginAndReservationSpaceManagementTest extends TestCase
             ->get(route('team.dashboard').'#reservas')
             ->assertOk()
             ->assertSee('Cadastrar espaco')
+            ->assertSee('Painel de espacos e agenda')
             ->assertSee('data-team-space-map', false)
             ->assertSee('data-team-space-pin', false)
+            ->assertSee('data-team-space-list-item', false)
             ->assertSee('data-team-space-empty', false)
-            ->assertSee('<details class="ops-collapsible spaces-fallback">', false)
-            ->assertDontSee('<details class="ops-collapsible spaces-fallback" open', false)
-            ->assertSee('Ver lista completa de espacos')
+            ->assertSee('reservation-map-board', false)
+            ->assertSee('pin-type-drawer', false)
+            ->assertDontSee('space-editor-form', false)
             ->assertDontSee('name="_team_form" value="space"', false);
 
         $this->actingAs($team)
             ->get(route('team.dashboard', ['create' => 'space']).'#reservas')
             ->assertOk()
-            ->assertSee('Novo espaco reservavel')
+            ->assertSee('Novo espaco')
+            ->assertSee('space-editor-form', false)
+            ->assertSee('Dados essenciais')
+            ->assertSee('Pin no mapa')
             ->assertSee('name="_team_form" value="space"', false);
 
         $this->actingAs($team)

@@ -919,6 +919,7 @@ const setupSpaceTypeColorForm = (form) => {
 
 const setupTeamSpaceMap = (section) => {
     const pins = [...section.querySelectorAll('[data-team-space-pin]')];
+    const listItems = [...section.querySelectorAll('[data-team-space-list-item]')];
     const details = [...section.querySelectorAll('[data-team-space-detail]')];
     const empty = section.querySelector('[data-team-space-empty]');
 
@@ -929,6 +930,10 @@ const setupTeamSpaceMap = (section) => {
     const selectSpace = (spaceId) => {
         pins.forEach((pin) => {
             pin.classList.toggle('is-active', pin.dataset.spaceId === spaceId);
+        });
+
+        listItems.forEach((item) => {
+            item.classList.toggle('is-active', item.dataset.spaceId === spaceId);
         });
 
         details.forEach((detail) => {
@@ -947,6 +952,20 @@ const setupTeamSpaceMap = (section) => {
             }
         });
     });
+
+    listItems.forEach((item) => {
+        item.addEventListener('click', () => {
+            if (item.dataset.spaceId) {
+                selectSpace(item.dataset.spaceId);
+            }
+        });
+    });
+
+    const firstSpaceId = pins[0]?.dataset.spaceId || listItems[0]?.dataset.spaceId;
+
+    if (firstSpaceId) {
+        selectSpace(firstSpaceId);
+    }
 };
 
 const compressReservationMapFile = (file) => new Promise((resolve, reject) => {
